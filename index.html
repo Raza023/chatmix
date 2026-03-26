@@ -447,14 +447,24 @@
             <div class="flex h-screen overflow-hidden">
                 <!-- Sidebar -->
                 <div class="w-80 glass-panel border-r border-white/10 flex flex-col">
-                    <div class="p-6 border-b border-white/10 flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <img src="./logo.png" class="w-10 h-10 rounded-xl">
-                            <span class="font-bold text-xl tracking-tight">ChatMix</span>
+                    <div class="p-6 border-b border-white/10">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <img src="./logo.png" class="w-10 h-10 rounded-xl">
+                                <span class="font-bold text-xl tracking-tight">ChatMix</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="toggleSearch()" class="p-2 hover:bg-white/10 rounded-full transition-colors text-white/70 hover:text-white">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                                </button>
+                                <button onclick="logout()" class="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                    <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                                </button>
+                            </div>
                         </div>
-                        <button onclick="logout()" class="p-2 hover:bg-white/10 rounded-full transition-colors">
-                            <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
-                        </button>
+                        <div id="searchBarContainer" class="hidden animate-fade-in">
+                            <input id="userSearch" oninput="handleSearch(this.value)" class="glass-input p-3 w-full rounded-xl text-sm" placeholder="Search by email...">
+                        </div>
                     </div>
                     <div class="p-4 flex-1 overflow-y-auto" id="users"></div>
                     <div class="p-4 glass-panel mt-auto border-t border-white/10">
@@ -509,8 +519,47 @@
         let unreadCounts = {};
         let listeners = {};
         let usersData = [];
+        let myData = null;
+        let activeChatUids = new Set();
+        let searchQuery = '';
+
+        function toggleSearch() {
+            const container = document.getElementById('searchBarContainer');
+            container.classList.toggle('hidden');
+            if (container.classList.contains('hidden')) {
+                searchQuery = '';
+                renderUserList();
+            } else {
+                document.getElementById('userSearch').focus();
+            }
+        }
+
+        function handleSearch(val) {
+            searchQuery = val.toLowerCase();
+            renderUserList();
+        }
 
         function loadUsers() {
+            // Watch my own data for status
+            db.ref('users/' + currentUser.uid).on('value', snap => {
+                myData = snap.val();
+                renderUserList();
+            });
+
+            // Identify active chats (only those with messages)
+            db.ref('messages').on('value', snap => {
+                activeChatUids.clear();
+                snap.forEach(chatRoom => {
+                    const id = chatRoom.key;
+                    if (id.includes(currentUser.uid)) {
+                        const parts = id.split('_');
+                        const otherUid = parts[0] === currentUser.uid ? parts[1] : parts[0];
+                        activeChatUids.add(otherUid);
+                    }
+                });
+                renderUserList();
+            });
+
             db.ref('users').on('value', snap => {
                 usersData = [];
                 snap.forEach(child => {
@@ -550,14 +599,35 @@
         }
 
         function renderUserList() {
+            const now = Date.now();
+
+            // Update my own status
+            const myStatusEl = document.getElementById('myStatus');
+            if (myStatusEl && myData) {
+                const isIOnline = myData.lastSeen && (now - myData.lastSeen < 60000);
+                myStatusEl.innerText = isIOnline ? 'Online' : 'Offline';
+                myStatusEl.className = `text-xs ${isIOnline ? 'text-green-400' : 'text-gray-500'}`;
+            }
+
             const usersDiv = document.getElementById('users');
             if (!usersDiv) return;
             usersDiv.innerHTML = '';
 
-            const now = Date.now();
+            const filteredUsers = usersData.filter(u => {
+                const matchesSearch = u.email.toLowerCase().includes(searchQuery) || u.name.toLowerCase().includes(searchQuery);
+                if (searchQuery) return matchesSearch;
+                return activeChatUids.has(u.uid);
+            });
 
-            usersData.forEach(u => {
-                const isOnline = u.lastSeen && (now - u.lastSeen < 60000); // 1 minute
+            if (filteredUsers.length === 0) {
+                usersDiv.innerHTML = `<div class="p-8 text-center text-gray-500 text-sm">
+                    ${searchQuery ? 'No users found matching your search.' : 'No active chats. Use search to find friends!'}
+                </div>`;
+                return;
+            }
+
+            filteredUsers.forEach(u => {
+                const isOnline = u.lastSeen && (now - u.lastSeen < 60000);
                 const count =  unreadCounts[u.uid] || 0;
                 const div = document.createElement('div');
                 div.className = `p-4 user-item cursor-pointer flex items-center space-x-4 ${selectedUser === u.uid ? 'active' : ''}`;

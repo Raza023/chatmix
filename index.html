@@ -154,6 +154,9 @@
             color: #4dff88;
         }
 
+        .status-dot-online { background: #10b981; box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
+        .status-dot-offline { background: #6b7280; }
+
         @keyframes slideIn {
             from {
                 transform: translateX(100%);
@@ -489,8 +492,11 @@
             if (!usersDiv) return;
             usersDiv.innerHTML = '';
 
+            const now = Date.now();
+
             usersData.forEach(u => {
-                const count = unreadCounts[u.uid] || 0;
+                const isOnline = u.lastSeen && (now - u.lastSeen < 60000); // 1 minute
+                const count =  unreadCounts[u.uid] || 0;
                 const div = document.createElement('div');
                 div.className = `p-4 user-item cursor-pointer flex items-center space-x-4 ${selectedUser === u.uid ? 'active' : ''}`;
                 div.innerHTML = `
@@ -499,11 +505,12 @@
                             ${u.name[0].toUpperCase()}
                         </div>
                         ${count > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#1a1a1a] animate-bounce">${count}</div>` : ''}
+                        <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#1a1a1a] ${isOnline ? 'status-dot-online' : 'status-dot-offline'}"></div>
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="font-semibold text-white truncate">${u.name}</p>
-                        <p class="text-xs ${count > 0 ? 'text-secondary font-bold' : 'text-gray-400'} truncate">
-                            ${count > 0 ? 'New message!' : 'Tap to chat'}
+                        <p class="text-xs ${isOnline ? 'text-green-400' : 'text-gray-500'} truncate">
+                            ${isOnline ? 'Online' : 'Offline'}
                         </p>
                     </div>
                 `;
@@ -537,6 +544,9 @@
                 text: msg,
                 time: Date.now()
             });
+
+            // Update status on message send
+            db.ref('users/' + currentUser.uid).update({ lastSeen: Date.now() });
 
             document.getElementById('msg').value = '';
         }
@@ -579,6 +589,9 @@
         }
 
         renderLogin();
+
+        // Status Refresh Timer
+        setInterval(renderUserList, 15000); // Refresh list every 15s to update online indicators
     </script>
 
 </body>

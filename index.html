@@ -274,6 +274,16 @@
             }, 4000);
         }
 
+        // Browser Notification Helper
+        function notifyBrowser(title, body) {
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification(title, {
+                    body: body,
+                    icon: './logo.png'
+                });
+            }
+        }
+
         //Firebase config:
         const firebaseConfig = {
             apiKey: "AIzaSyC75CgQIV23L4K6SFaWsYu2wnI7TMtVM6A",
@@ -488,6 +498,11 @@
             </div>`;
 
             loadUsers();
+            
+            // Request Browser Notification Permission
+            if ("Notification" in window && Notification.permission !== "granted") {
+                Notification.requestPermission();
+            }
         }
 
         let selectedUser = null;
@@ -527,6 +542,7 @@
                 if (msg.sender !== currentUser.uid && uid !== selectedUser) {
                     unreadCounts[uid] = (unreadCounts[uid] || 0) + 1;
                     showToast(`New message from ${name}`, 'success');
+                    notifyBrowser(`New Message: ${name}`, msg.text || 'Sent you a message.');
                     renderUserList();
                 }
             });

@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatMix | Connect Seamlessly</title>
+    <link rel="icon" type="image/png" href="./logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #8E2DE2;
+            --primary-light: #4A00E0;
+            --secondary: #00d2ff;
+            --accent: #FF0080;
+            --glass: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: url('./bg.png') no-repeat center center fixed;
+            background-size: cover;
+            min-height: 100vh;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .glass-panel {
+            background: var(--glass);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .glass-input {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            color: #ffffff;
+            font-weight: 500;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .glass-input:focus {
+            background: rgba(0, 0, 0, 0.4);
+            border-color: var(--secondary);
+            outline: none;
+            box-shadow: 0 0 20px rgba(0, 210, 255, 0.4), inset 0 0 10px rgba(255, 255, 255, 0.05);
+            transform: scale(1.01);
+        }
+
+        .gradient-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .gradient-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(142, 45, 226, 0.4);
+        }
+
+        .chat-bubble-mine {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border-radius: 20px 20px 0 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-bubble-theirs {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px 20px 20px 0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-item {
+            transition: all 0.2s ease;
+            border-radius: 12px;
+            margin-bottom: 8px;
+        }
+
+        .user-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .user-item.active {
+            background: linear-gradient(90deg, rgba(142, 45, 226, 0.3) 0%, transparent 100%);
+            border-left: 4px solid var(--primary);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Custom Toast Notification */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        .chatmix-toast {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+            pointer-events: auto;
+            max-width: 320px;
+        }
+
+        .toast-icon-error {
+            color: #ff4d4d;
+        }
+
+        .toast-icon-success {
+            color: #4dff88;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="toast-container"></div>
+    <div id="app" class="flex items-center justify-center min-h-screen p-4"></div>
+
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+
+    <script>
+        (function () {
+            emailjs.init("La4jKdbxwJ4KsEEhr");
+        })();
+
+        // Premium Notification System
+        function showToast(message, type = 'error') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'chatmix-toast';
+
+            const icon = type === 'error'
+                ? '<svg class="w-6 h-6 toast-icon-error" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>'
+                : '<svg class="w-6 h-6 toast-icon-success" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>';
+
+            toast.innerHTML = `
+                ${icon}
+                <div class="flex-1">
+                    <p class="text-sm font-semibold">${type === 'error' ? 'Oops!' : 'Success'}</p>
+                    <p class="text-xs text-white/70">${message}</p>
+                </div>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.4s ease forwards';
+                setTimeout(() => toast.remove(), 400);
+            }, 4000);
+        }
+
+        //Firebase config:
+        const firebaseConfig = {
+            apiKey: "AIzaSyC75CgQIV23L4K6SFaWsYu2wnI7TMtVM6A",
+            authDomain: "survey-b6afd.firebaseapp.com",
+            databaseURL: "https://survey-b6afd-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "survey-b6afd",
+            storageBucket: "survey-b6afd.appspot.com",
+            messagingSenderId: "248577674670",
+            appId: "1:248577674670:web:68e64b4f97784108360c3f"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        let currentUser = null;
+        let verificationCode = null;
+        let tempEmail = null;
+
+        function renderLogin() {
+            app.innerHTML = `
+            <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in">
+                <div class="text-center mb-8">
+                    <img src="./logo.png" alt="ChatMix Logo" class="w-20 h-20 mx-auto mb-4 rounded-2xl shadow-xl">
+                    <h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">ChatMix</h1>
+                    <p class="text-gray-400 mt-2">Welcome back! Please login.</p>
+                </div>
+                <div class="space-y-4">
+                    <input id="email" class="glass-input p-4 w-full rounded-xl" placeholder="Email Address">
+                    <input id="password" type="password" class="glass-input p-4 w-full rounded-xl" placeholder="Password">
+                    <button onclick="login()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg mt-4">Login</button>
+                    <p class="text-center mt-6 text-sm text-gray-400">
+                        Don't have an account? <span onclick="renderSignup()" class="text-purple-400 cursor-pointer hover:underline font-semibold">Sign up</span>
+                    </p>
+                </div>
+            </div>`;
+        }
+
+        function renderSignup() {
+            app.innerHTML = `
+            <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in">
+                <div class="text-center mb-8">
+                    <img src="./logo.png" alt="ChatMix Logo" class="w-16 h-16 mx-auto mb-4 rounded-xl shadow-lg">
+                    <h2 class="text-3xl font-bold text-white">Join ChatMix</h2>
+                    <p class="text-gray-400 mt-2">Create your account to start mixing.</p>
+                </div>
+                <div class="space-y-4">
+                    <input id="email" class="glass-input p-4 w-full rounded-xl" placeholder="Email">
+                    <input id="name" class="glass-input p-4 w-full rounded-xl" placeholder="Alias (Display Name)">
+                    <button onclick="sendCode()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg mt-4">Send Verification Code</button>
+                    <p class="text-center mt-4 text-sm text-gray-400">
+                        Already have an account? <span onclick="renderLogin()" class="text-purple-400 cursor-pointer hover:underline">Login</span>
+                    </p>
+                </div>
+            </div>`;
+        }
+
+        function sendCode() {
+            tempEmail = document.getElementById('email').value;
+            const name = document.getElementById('name').value;
+            if (!tempEmail || !name) return showToast('Please fill all fields to continue.');
+
+            verificationCode = Math.floor(1000 + Math.random() * 9000);
+
+            const templateParams = {
+                to_email: tempEmail,
+                name: name,
+                otp_code: verificationCode
+            };
+
+            emailjs.send("service_ijfry7u", "template_igxg83j", templateParams)
+                .then(function () {
+                    showToast('Verification code sent to email!', 'success');
+
+                    db.ref('pendingUsers/' + tempEmail.replace('.', '_')).set({ name, code: verificationCode });
+                    renderVerify();
+                }, function (error) {
+                    showToast('Failed to send email. Please try again later.');
+                });
+        }
+
+        function renderVerify() {
+            app.innerHTML = `
+            <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in">
+                <h2 class="text-2xl font-bold mb-6 text-center">Verify Identity</h2>
+                <p class="text-gray-400 mb-6 text-center">Enter the 4-digit code sent to your email.</p>
+                <input id="code" class="glass-input p-4 w-full rounded-xl text-center text-2xl tracking-widest mb-4" placeholder="0000">
+                <button onclick="verifyCode()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">Verify & Continue</button>
+            </div>`;
+        }
+
+        function verifyCode() {
+            const entered = document.getElementById('code').value;
+
+            db.ref('pendingUsers/' + tempEmail.replace('.', '_')).once('value', snap => {
+                const data = snap.val();
+                if (data && entered == data.code) {
+                    renderCreatePassword();
+                } else {
+                    showToast('Incorrect verification code. Please check your email.');
+                    renderSignup();
+                }
+            });
+        }
+
+        function renderCreatePassword() {
+            app.innerHTML = `
+            <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in">
+                <h2 class="text-2xl font-bold mb-6 text-center">Secure Your Account</h2>
+                <input id="password" type="password" class="glass-input p-4 w-full rounded-xl mb-4" placeholder="Strong Password">
+                <button onclick="createAccount()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">Complete Registration</button>
+            </div>`;
+        }
+
+        function createAccount() {
+            const password = document.getElementById('password').value;
+
+            db.ref('pendingUsers/' + tempEmail.replace('.', '_')).once('value', snap => {
+                const data = snap.val();
+
+                auth.createUserWithEmailAndPassword(tempEmail, password)
+                    .then(userCred => {
+                        db.ref('users/' + userCred.user.uid).set({
+                            email: tempEmail,
+                            name: data.name
+                        });
+                        showToast('Account created successfully!', 'success');
+                        renderLogin();
+                    })
+                    .catch(err => showToast(err.message));
+            });
+        }
+
+        function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            auth.signInWithEmailAndPassword(email, password)
+                .then(userCred => {
+                    currentUser = userCred.user;
+                    showToast(`Successfully logged in!`, 'success');
+                    renderChat();
+                })
+                .catch(err => {
+                    if (err.code === 'auth/invalid-login-credentials' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+                        showToast('Your email or password is incorrect.');
+                    } else if (err.code === 'auth/invalid-email') {
+                        showToast('The email address you entered is invalid.');
+                    } else {
+                        showToast(err.message);
+                    }
+                });
+        }
+
+        function renderChat() {
+            app.className = "w-full h-screen p-0";
+            app.innerHTML = `
+            <div class="flex h-screen overflow-hidden">
+                <!-- Sidebar -->
+                <div class="w-80 glass-panel border-r border-white/10 flex flex-col">
+                    <div class="p-6 border-b border-white/10 flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <img src="./logo.png" class="w-10 h-10 rounded-xl">
+                            <span class="font-bold text-xl tracking-tight">ChatMix</span>
+                        </div>
+                        <button onclick="location.reload()" class="p-2 hover:bg-white/10 rounded-full transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                        </button>
+                    </div>
+                    <div class="p-4 flex-1 overflow-y-auto" id="users"></div>
+                    <div class="p-4 glass-panel mt-auto border-t border-white/10">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center font-bold">
+                                ${currentUser.email[0].toUpperCase()}
+                            </div>
+                            <div class="truncate">
+                                <p class="font-semibold text-sm">${currentUser.email}</p>
+                                <p class="text-xs text-green-400">Online</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Area -->
+                <div class="flex-1 flex flex-col relative">
+                    <div id="chatHeader" class="p-4 glass-panel border-b border-white/10 flex items-center justify-between z-10">
+                        <h3 class="font-bold text-lg" id="selectedUserName">Select a contact</h3>
+                        <div class="flex space-x-4">
+                            <button class="p-2 hover:bg-white/10 rounded-full transition">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="chatBox" class="flex-1 p-6 overflow-y-auto space-y-4">
+                        <div class="flex items-center justify-center h-full text-gray-500 opacity-50 flex-col space-y-4">
+                            <img src="./logo.png" class="w-24 h-24 grayscale opacity-20">
+                            <p>Welcome to ChatMix. Your messages are end-to-end encrypted.</p>
+                        </div>
+                    </div>
+
+                    <div class="p-2 glass-panel mx-6 mb-6 rounded-2xl border border-white/10 flex items-center space-x-2 focus-within:ring-2 focus-within:ring-secondary transition-all">
+                        <input id="msg" class="bg-black/40 border-none focus:ring-0 flex-1 p-3 text-white placeholder-white/30 font-medium rounded-xl" placeholder="Write something dope...">
+                        <button onclick="sendMsg()" class="gradient-btn p-3 rounded-xl shadow-lg text-white group">
+                            <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+
+            loadUsers();
+        }
+
+        let selectedUser = null;
+
+        function loadUsers() {
+            db.ref('users').on('value', snap => {
+                const usersDiv = document.getElementById('users');
+                usersDiv.innerHTML = '';
+
+                snap.forEach(child => {
+                    const u = child.val();
+                    if (child.key !== currentUser.uid) {
+                        const div = document.createElement('div');
+                        div.className = `p-4 user-item cursor-pointer flex items-center space-x-4 ${selectedUser === child.key ? 'active' : ''}`;
+                        div.innerHTML = `
+                            <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold border border-white/10">
+                                ${u.name[0].toUpperCase()}
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-semibold">${u.name}</p>
+                                <p class="text-xs text-gray-400">Tap to chat</p>
+                            </div>
+                        `;
+                        div.onclick = () => {
+                            selectUser(child.key, u.name);
+                            // Highlight selected user
+                            document.querySelectorAll('.user-item').forEach(el => el.classList.remove('active'));
+                            div.classList.add('active');
+                        };
+                        usersDiv.appendChild(div);
+                    }
+                });
+            });
+        }
+
+        function selectUser(uid, name) {
+            selectedUser = uid;
+            document.getElementById('selectedUserName').innerText = name;
+            loadMessages();
+        }
+
+        function chatId(a, b) {
+            return a < b ? a + '_' + b : b + '_' + a;
+        }
+
+        function sendMsg() {
+            const msg = document.getElementById('msg').value;
+            if (!msg || !selectedUser) return;
+
+            const id = chatId(currentUser.uid, selectedUser);
+
+            db.ref('messages/' + id).push({
+                sender: currentUser.uid,
+                text: msg,
+                time: Date.now()
+            });
+
+            document.getElementById('msg').value = '';
+        }
+
+        function loadMessages() {
+            const id = chatId(currentUser.uid, selectedUser);
+
+            db.ref('messages/' + id).on('value', snap => {
+                const chatBox = document.getElementById('chatBox');
+                chatBox.innerHTML = '';
+
+                snap.forEach(child => {
+                    const m = child.val();
+                    const isMine = m.sender === currentUser.uid;
+                    const div = document.createElement('div');
+                    div.className = `flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in`;
+                    div.innerHTML = `
+                        <div class="max-w-xs md:max-w-md p-4 ${isMine ? 'chat-bubble-mine' : 'chat-bubble-theirs'}">
+                            <p class="text-sm font-medium leading-relaxed">${m.text}</p>
+                            <p class="text-[10px] mt-1 opacity-50 text-right">${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                    `;
+                    chatBox.appendChild(div);
+                });
+                chatBox.scrollTop = chatBox.scrollHeight;
+            });
+        }
+
+        renderLogin();
+    </script>
+
+</body>
+
+</html>

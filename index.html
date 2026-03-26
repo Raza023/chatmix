@@ -414,8 +414,8 @@
                                 ${currentUser.email[0].toUpperCase()}
                             </div>
                             <div class="truncate">
-                                <p class="font-semibold text-sm text-white">${currentUser.email}</p>
-                                <p id="myStatus" class="text-xs text-green-400">Online</p>
+                                <p class="font-semibold text-sm">${currentUser.email}</p>
+                                <p class="text-xs text-green-400">Online</p>
                             </div>
                         </div>
                     </div>
@@ -455,15 +455,8 @@
         let unreadCounts = {};
         let listeners = {};
         let usersData = [];
-        let myData = null;
 
         function loadUsers() {
-            // Listen to my own data for status
-            db.ref('users/' + currentUser.uid).on('value', snap => {
-                myData = snap.val();
-                renderUserList();
-            });
-
             db.ref('users').on('value', snap => {
                 usersData = [];
                 snap.forEach(child => {
@@ -495,19 +488,11 @@
         }
 
         function renderUserList() {
-            const now = Date.now();
-
-            // Update my own status in sidebar
-            const myStatusEl = document.getElementById('myStatus');
-            if (myStatusEl && myData) {
-                const isIOnline = myData.lastSeen && (now - myData.lastSeen < 60000);
-                myStatusEl.innerText = isIOnline ? 'Online' : 'Offline';
-                myStatusEl.className = `text-xs ${isIOnline ? 'text-green-400' : 'text-gray-500'}`;
-            }
-
             const usersDiv = document.getElementById('users');
             if (!usersDiv) return;
             usersDiv.innerHTML = '';
+
+            const now = Date.now();
 
             usersData.forEach(u => {
                 const isOnline = u.lastSeen && (now - u.lastSeen < 60000); // 1 minute

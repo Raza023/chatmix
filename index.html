@@ -618,17 +618,22 @@
                 
                 chatBox.innerHTML = '';
 
+                let hasUnread = false;
+                const updates = {};
+                
+                chatBox.innerHTML = '';
+
                 snap.forEach(child => {
                     const m = child.val();
                     const isMine = m.sender === currentUser.uid;
 
-                    // If it's not my message and I'm seeing it now, it's read (3)
+                    // Collect updates for unread messages (receiver side)
                     if (!isMine && (!m.status || m.status < 3)) {
-                        db.ref(newPath + '/' + child.key).update({ status: 3 });
+                        updates[child.key + '/status'] = 3;
+                        hasUnread = true;
                     }
 
                     const ticks = isMine ? getTicks(m.status || 1) : '';
-
                     const div = document.createElement('div');
                     div.className = `flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in`;
                     div.innerHTML = `
@@ -642,6 +647,12 @@
                     `;
                     chatBox.appendChild(div);
                 });
+
+                // Fire a single consolidated update if needed
+                if (hasUnread) {
+                    db.ref(newPath).update(updates);
+                }
+
                 chatBox.scrollTop = chatBox.scrollHeight;
             });
         }

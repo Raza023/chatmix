@@ -541,11 +541,23 @@
             document.getElementById('msg').value = '';
         }
 
+        let currentChatPath = null;
+
         function loadMessages() {
             const id = chatId(currentUser.uid, selectedUser);
+            const newPath = 'messages/' + id;
 
-            db.ref('messages/' + id).on('value', snap => {
+            // Stop listening to previous chat to prevent message bleeding
+            if (currentChatPath) {
+                db.ref(currentChatPath).off();
+            }
+
+            currentChatPath = newPath;
+
+            db.ref(newPath).on('value', snap => {
                 const chatBox = document.getElementById('chatBox');
+                if (!chatBox) return; // Guard for render switching
+                
                 chatBox.innerHTML = '';
 
                 snap.forEach(child => {

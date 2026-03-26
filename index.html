@@ -548,8 +548,9 @@
             const newPath = 'messages/' + id;
 
             // Stop listening to previous chat to prevent message bleeding
+            // Targeted .off('value') ensures we don't kill background unread listeners
             if (currentChatPath) {
-                db.ref(currentChatPath).off();
+                db.ref(currentChatPath).off('value');
             }
 
             currentChatPath = newPath;

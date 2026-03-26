@@ -264,7 +264,7 @@
                 </div>
                 <div class="space-y-4">
                     <input id="email" class="glass-input p-4 w-full rounded-xl" placeholder="Email Address">
-                    <input id="password" type="password" class="glass-input p-4 w-full rounded-xl" placeholder="Password">
+                    <input id="password" type="password" onkeydown="if(event.key === 'Enter') login()" class="glass-input p-4 w-full rounded-xl" placeholder="Password">
                     <button onclick="login()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg mt-4">Login</button>
                     <p class="text-center mt-6 text-sm text-gray-400">
                         Don't have an account? <span onclick="renderSignup()" class="text-purple-400 cursor-pointer hover:underline font-semibold">Sign up</span>
@@ -283,7 +283,7 @@
                 </div>
                 <div class="space-y-4">
                     <input id="email" class="glass-input p-4 w-full rounded-xl" placeholder="Email">
-                    <input id="name" class="glass-input p-4 w-full rounded-xl" placeholder="Alias (Display Name)">
+                    <input id="name" onkeydown="if(event.key === 'Enter') sendCode()" class="glass-input p-4 w-full rounded-xl" placeholder="Alias (Display Name)">
                     <button onclick="sendCode()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg mt-4">Send Verification Code</button>
                     <p class="text-center mt-4 text-sm text-gray-400">
                         Already have an account? <span onclick="renderLogin()" class="text-purple-400 cursor-pointer hover:underline">Login</span>
@@ -321,7 +321,7 @@
             <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in">
                 <h2 class="text-2xl font-bold mb-6 text-center">Verify Identity</h2>
                 <p class="text-gray-400 mb-6 text-center">Enter the 4-digit code sent to your email.</p>
-                <input id="code" class="glass-input p-4 w-full rounded-xl text-center text-2xl tracking-widest mb-4" placeholder="0000">
+                <input id="code" onkeydown="if(event.key === 'Enter') verifyCode()" class="glass-input p-4 w-full rounded-xl text-center text-2xl tracking-widest mb-4" placeholder="0000">
                 <button onclick="verifyCode()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">Verify & Continue</button>
             </div>`;
         }
@@ -344,7 +344,7 @@
             app.innerHTML = `
             <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in">
                 <h2 class="text-2xl font-bold mb-6 text-center">Secure Your Account</h2>
-                <input id="password" type="password" class="glass-input p-4 w-full rounded-xl mb-4" placeholder="Strong Password">
+                <input id="password" onkeydown="if(event.key === 'Enter') createAccount()" type="password" class="glass-input p-4 w-full rounded-xl mb-4" placeholder="Strong Password">
                 <button onclick="createAccount()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">Complete Registration</button>
             </div>`;
         }

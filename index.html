@@ -449,35 +449,70 @@
         }
 
         let selectedUser = null;
+        let unreadCounts = {};
+        let listeners = {};
+        let usersData = [];
 
         function loadUsers() {
             db.ref('users').on('value', snap => {
-                const usersDiv = document.getElementById('users');
-                usersDiv.innerHTML = '';
-
+                usersData = [];
                 snap.forEach(child => {
                     const u = child.val();
-                    if (child.key !== currentUser.uid) {
-                        const div = document.createElement('div');
-                        div.className = `p-4 user-item cursor-pointer flex items-center space-x-4 ${selectedUser === child.key ? 'active' : ''}`;
-                        div.innerHTML = `
-                            <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold border border-white/10">
-                                ${u.name[0].toUpperCase()}
-                            </div>
-                            <div class="flex-1">
-                                <p class="font-semibold">${u.name}</p>
-                                <p class="text-xs text-gray-400">Tap to chat</p>
-                            </div>
-                        `;
-                        div.onclick = () => {
-                            selectUser(child.key, u.name);
-                            // Highlight selected user
-                            document.querySelectorAll('.user-item').forEach(el => el.classList.remove('active'));
-                            div.classList.add('active');
-                        };
-                        usersDiv.appendChild(div);
+                    const uid = child.key;
+                    if (uid !== currentUser.uid) {
+                        usersData.push({ uid, ...u });
+                        setupMessageListener(uid, u.name);
                     }
                 });
+                renderUserList();
+            });
+        }
+
+        function setupMessageListener(uid, name) {
+            if (listeners[uid]) return;
+            const id = chatId(currentUser.uid, uid);
+            let initialLoad = true;
+            listeners[uid] = db.ref('messages/' + id).on('child_added', msgSnap => {
+                if (initialLoad) return;
+                const msg = msgSnap.val();
+                if (msg.sender !== currentUser.uid && uid !== selectedUser) {
+                    unreadCounts[uid] = (unreadCounts[uid] || 0) + 1;
+                    showToast(`New message from ${name}`, 'success');
+                    renderUserList();
+                }
+            });
+            setTimeout(() => { initialLoad = false; }, 1200);
+        }
+
+        function renderUserList() {
+            const usersDiv = document.getElementById('users');
+            if (!usersDiv) return;
+            usersDiv.innerHTML = '';
+
+            usersData.forEach(u => {
+                const count = unreadCounts[u.uid] || 0;
+                const div = document.createElement('div');
+                div.className = `p-4 user-item cursor-pointer flex items-center space-x-4 ${selectedUser === u.uid ? 'active' : ''}`;
+                div.innerHTML = `
+                    <div class="relative">
+                        <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold border border-white/10 text-white">
+                            ${u.name[0].toUpperCase()}
+                        </div>
+                        ${count > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#1a1a1a] animate-bounce">${count}</div>` : ''}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-white truncate">${u.name}</p>
+                        <p class="text-xs ${count > 0 ? 'text-secondary font-bold' : 'text-gray-400'} truncate">
+                            ${count > 0 ? 'New message!' : 'Tap to chat'}
+                        </p>
+                    </div>
+                `;
+                div.onclick = () => {
+                    unreadCounts[u.uid] = 0;
+                    selectUser(u.uid, u.name);
+                    renderUserList();
+                };
+                usersDiv.appendChild(div);
             });
         }
 

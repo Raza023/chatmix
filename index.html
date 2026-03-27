@@ -814,7 +814,9 @@
             // Update status on message send
             db.ref('users/' + currentUser.uid).update({ lastSeen: Date.now() });
 
-            document.getElementById('msg').value = '';
+            const msgEl = document.getElementById('msg');
+            msgEl.value = '';
+            autoResize(msgEl); // Reset height after sending
         }
 
         function reactToMsg(key, emoji) {

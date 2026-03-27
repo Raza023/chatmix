@@ -446,7 +446,7 @@
             app.innerHTML = `
             <div class="flex h-screen overflow-hidden">
                 <!-- Sidebar -->
-                <div class="w-80 glass-panel border-r border-white/10 flex flex-col">
+                <div id="sidebarSection" class="w-full md:w-80 glass-panel border-r border-white/10 flex flex-col">
                     <div class="p-6 border-b border-white/10">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center space-x-3">
@@ -481,9 +481,14 @@
                 </div>
 
                 <!-- Chat Area -->
-                <div class="flex-1 flex flex-col relative">
+                <div id="chatSection" class="flex-1 hidden md:flex flex-col relative bg-black/20 md:bg-transparent">
                     <div id="chatHeader" class="p-4 glass-panel border-b border-white/10 flex items-center justify-between z-10">
-                        <h3 class="font-bold text-lg" id="selectedUserName">Select a contact</h3>
+                        <div class="flex items-center space-x-3">
+                            <button onclick="goBack()" class="p-2 -ml-2 md:hidden hover:bg-white/10 rounded-full transition-colors text-white">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path></svg>
+                            </button>
+                            <h3 class="font-bold text-lg text-white" id="selectedUserName">Select a contact</h3>
+                        </div>
                         <div class="flex space-x-4">
                             <button class="p-2 hover:bg-white/10 rounded-full transition">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
@@ -658,7 +663,22 @@
         function selectUser(uid, name) {
             selectedUser = uid;
             document.getElementById('selectedUserName').innerText = name;
+            
+            // Mobile Transition
+            if (window.innerWidth < 768) {
+                document.getElementById('sidebarSection').classList.add('hidden');
+                document.getElementById('chatSection').classList.remove('hidden');
+                document.getElementById('chatSection').classList.add('flex');
+            }
+
             loadMessages();
+        }
+
+        function goBack() {
+            document.getElementById('sidebarSection').classList.remove('hidden');
+            document.getElementById('chatSection').classList.add('hidden');
+            document.getElementById('chatSection').classList.remove('flex');
+            selectedUser = null;
         }
 
         function chatId(a, b) {

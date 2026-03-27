@@ -821,7 +821,7 @@
                                 `).join('')}
                             </div>
 
-                            ${m.text === ':tom_meme:' || m.text === ':tom_meme: ' ?
+                            ${m.text === ':tom_meme:' ?
                             `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg">` :
                             `<p class="text-sm font-medium leading-relaxed">${m.text}</p>`
                         }
@@ -930,7 +930,10 @@
             const input = document.getElementById('msg');
             const words = input.value.split(' ');
             words[words.length - 1] = EMOJI_MAP[code];
-            input.value = words.join(' ') + ' ';
+            
+            const suffix = (code === ':tom_meme:') ? '' : ' ';
+            input.value = words.join(' ') + suffix;
+            
             document.getElementById('emojiSuggestions').classList.add('hidden');
             input.focus();
         }

@@ -800,7 +800,7 @@
                             </button>` : ''}
                             
                             <div class="absolute -top-8 ${isMine ? 'right-0' : 'left-0'} flex space-x-1 p-1.5 rounded-2xl reaction-picker opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 z-30 pointer-events-none group-hover:pointer-events-auto">
-                                ${['👍', '❤️', '😂', '😮', '😢', '🙏'].map(e => `
+                                ${['👍', '❤️', '🥶', '😂', '😮', '😢'].map(e => `
                                     <span onclick="reactToMsg('${child.key}', '${e}')" class="cursor-pointer hover:scale-125 transition-transform px-1">${e}</span>
                                 `).join('')}
                             </div>

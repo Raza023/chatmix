@@ -219,13 +219,27 @@
         .typing-dots span {
             animation: typing 1.4s infinite both;
         }
-        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        .typing-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
 
         @keyframes typing {
-            0% { opacity: 0.2; }
-            20% { opacity: 1; }
-            100% { opacity: 0.2; }
+            0% {
+                opacity: 0.2;
+            }
+
+            20% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.2;
+            }
         }
     </style>
 </head>
@@ -263,6 +277,12 @@
                 if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
             }
             return null;
+        }
+
+        function escapeHTML(str) {
+            const p = document.createElement('p');
+            p.textContent = str;
+            return p.innerHTML;
         }
 
         function eraseCookie(name) {
@@ -572,7 +592,7 @@
             if (!selectedUser) return;
             const ref = db.ref(`typing/${currentUser.uid}/${selectedUser}`);
             ref.set(true);
-            
+
             clearTimeout(typingTimer);
             typingTimer = setTimeout(() => {
                 ref.set(false);
@@ -707,13 +727,13 @@
                 div.innerHTML = `
                     <div class="relative">
                         <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold border border-white/10 text-white">
-                            ${u.name[0].toUpperCase()}
+                            ${escapeHTML(u.name)[0].toUpperCase()}
                         </div>
                         ${count > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#1a1a1a] animate-bounce">${count}</div>` : ''}
                         <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#1a1a1a] ${isOnline ? 'status-dot-online' : 'status-dot-offline'}"></div>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="font-semibold text-white truncate">${u.name}</p>
+                        <p class="font-semibold text-white truncate">${escapeHTML(u.name)}</p>
                         ${isTyping ? `
                             <p class="text-xs text-secondary italic font-medium typing-dots">Typing<span>.</span><span>.</span><span>.</span></p>
                         ` : `
@@ -887,7 +907,7 @@
 
                             ${m.text === ':tom_meme:' ?
                             `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg">` :
-                            `<p class="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">${m.text}</p>`
+                            `<p class="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(m.text)}</p>`
                         }
                             ${reactionsHtml}
                             <div class="flex items-center justify-end space-x-1 mt-1 opacity-60">
@@ -1000,10 +1020,10 @@
             const input = document.getElementById('msg');
             const words = input.value.split(' ');
             words[words.length - 1] = EMOJI_MAP[code];
-            
+
             const suffix = (code === ':tom_meme:') ? '' : ' ';
             input.value = words.join(' ') + suffix;
-            
+
             document.getElementById('emojiSuggestions').classList.add('hidden');
             input.focus();
         }

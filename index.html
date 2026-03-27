@@ -461,6 +461,10 @@
                             email: tempEmail,
                             name: data.name
                         });
+
+                        // Delete pending entry after successful verification & account creation
+                        db.ref('pendingUsers/' + tempEmail.replace('.', '_')).remove();
+
                         showToast('Account created successfully!', 'success');
                         setCookie('chatmix_logged_in', userCred.user.uid, 20);
                         currentUser = userCred.user;
@@ -940,12 +944,12 @@
                             </div>
 
                             ${m.type === 'image' ?
-                                `<img src="${m.text}" class="w-full max-w-[300px] rounded-xl border border-white/10 shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer" onclick="window.open('${m.text}', '_blank')">` :
-                                (m.text === ':tom_meme:' ?
-                                    `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg house-meme">` :
-                                    `<p class="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(m.text)}</p>`
-                                )
-                            }
+                            `<img src="${m.text}" class="w-full max-w-[300px] rounded-xl border border-white/10 shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer" onclick="window.open('${m.text}', '_blank')">` :
+                            (m.text === ':tom_meme:' ?
+                                `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg house-meme">` :
+                                `<p class="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(m.text)}</p>`
+                            )
+                        }
                             ${reactionsHtml}
                             <div class="flex items-center justify-end space-x-1 mt-1 opacity-60">
                                 <p class="text-[10px]">${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>

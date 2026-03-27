@@ -599,7 +599,8 @@
 
         function handleTypingStatus() {
             if (!selectedUser) return;
-            const ref = db.ref(`typing/${currentUser.uid}/${selectedUser}`);
+            // Write specifically to the recipient's typing-inbox
+            const ref = db.ref(`typing_to/${selectedUser}/${currentUser.uid}`);
             ref.set(true);
 
             clearTimeout(typingTimer);
@@ -640,16 +641,16 @@
                 renderUserList();
             });
 
-            // Typing listeners
-            db.ref('typing').on('value', snap => {
+            // Secure Typing Listeners: Watch my own "notification" node for who is typing to me
+            db.ref('typing_to/' + currentUser.uid).on('value', snap => {
                 const data = snap.val() || {};
                 const prev = JSON.stringify(typingUsers);
+                
                 typingUsers = {};
-                Object.entries(data).forEach(([senderUid, recipients]) => {
-                    if (recipients[currentUser.uid]) {
-                        typingUsers[senderUid] = true;
-                    }
+                Object.entries(data).forEach(([senderUid, isTyping]) => {
+                    if (isTyping) typingUsers[senderUid] = true;
                 });
+
                 if (prev !== JSON.stringify(typingUsers)) {
                     renderUserList();
                     updateChatTypingStatus();

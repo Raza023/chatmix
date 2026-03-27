@@ -215,6 +215,18 @@
             height: 100vh;
             height: 100dvh;
         }
+
+        .typing-dots span {
+            animation: typing 1.4s infinite both;
+        }
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0% { opacity: 0.2; }
+            20% { opacity: 1; }
+            100% { opacity: 0.2; }
+        }
     </style>
 </head>
 
@@ -522,11 +534,15 @@
                         </div>
                     </div>
 
+                    <div id="typingIndicator" class="px-6 py-1 h-6 text-xs text-secondary font-medium animate-pulse hidden">
+                        <span id="typingText"></span>
+                    </div>
+
                     <div class="relative px-6 mb-2">
                         <div id="emojiSuggestions" class="hidden absolute bottom-full left-6 right-6 p-2 mb-2 glass-panel rounded-xl border border-white/10 z-50 flex flex-col space-y-1"></div>
                     </div>
                     <div class="p-2 glass-panel mx-6 mb-6 rounded-2xl border border-white/10 flex items-center space-x-2 focus-within:ring-2 focus-within:ring-secondary transition-all">
-                        <input id="msg" oninput="handleEmojiInput()" onkeydown="handleMsgKeydown(event)" class="bg-black/40 border-none focus:ring-0 flex-1 p-3 text-white placeholder-white/30 font-medium rounded-xl" placeholder="Write something dope...">
+                        <input id="msg" oninput="handleEmojiInput(); handleTypingStatus()" onkeydown="handleMsgKeydown(event)" class="bg-black/40 border-none focus:ring-0 flex-1 p-3 text-white placeholder-white/30 font-medium rounded-xl" placeholder="Write something dope...">
                         <button onclick="sendMsg()" class="gradient-btn p-3 rounded-xl shadow-lg text-white group">
                             <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                         </button>
@@ -549,6 +565,19 @@
         let myData = null;
         let activeChatUids = new Set();
         let searchQuery = '';
+        let typingUsers = {}; // uid -> boolean
+        let typingTimer;
+
+        function handleTypingStatus() {
+            if (!selectedUser) return;
+            const ref = db.ref(`typing/${currentUser.uid}/${selectedUser}`);
+            ref.set(true);
+            
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                ref.set(false);
+            }, 3000);
+        }
 
         function toggleSearch() {
             const container = document.getElementById('searchBarContainer');
@@ -585,6 +614,22 @@
                     }
                 });
                 renderUserList();
+            });
+
+            // Typing listeners
+            db.ref('typing').on('value', snap => {
+                const data = snap.val() || {};
+                const prev = JSON.stringify(typingUsers);
+                typingUsers = {};
+                Object.entries(data).forEach(([senderUid, recipients]) => {
+                    if (recipients[currentUser.uid]) {
+                        typingUsers[senderUid] = true;
+                    }
+                });
+                if (prev !== JSON.stringify(typingUsers)) {
+                    renderUserList();
+                    updateChatTypingStatus();
+                }
             });
 
             db.ref('users').on('value', snap => {
@@ -655,6 +700,7 @@
 
             filteredUsers.forEach(u => {
                 const isOnline = u.lastSeen && (now - u.lastSeen < 60000);
+                const isTyping = typingUsers[u.uid];
                 const count = unreadCounts[u.uid] || 0;
                 const div = document.createElement('div');
                 div.className = `p-4 user-item cursor-pointer flex items-center space-x-4 ${selectedUser === u.uid ? 'active' : ''}`;
@@ -668,9 +714,13 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="font-semibold text-white truncate">${u.name}</p>
-                        <p class="text-xs ${isOnline ? 'text-green-400' : 'text-gray-500'} truncate">
-                            ${isOnline ? 'Online' : 'Offline'}
-                        </p>
+                        ${isTyping ? `
+                            <p class="text-xs text-secondary italic font-medium typing-dots">Typing<span>.</span><span>.</span><span>.</span></p>
+                        ` : `
+                            <p class="text-xs ${isOnline ? 'text-green-400' : 'text-gray-500'} truncate">
+                                ${isOnline ? 'Online' : 'Offline'}
+                            </p>
+                        `}
                     </div>
                 `;
                 div.onclick = () => {
@@ -680,6 +730,20 @@
                 };
                 usersDiv.appendChild(div);
             });
+        }
+
+        function updateChatTypingStatus() {
+            const indicator = document.getElementById('typingIndicator');
+            const typingText = document.getElementById('typingText');
+            if (!indicator || !selectedUser) return;
+
+            if (typingUsers[selectedUser]) {
+                const name = document.getElementById('selectedUserName').innerText;
+                typingText.innerHTML = `${name} is typing<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>`;
+                indicator.classList.remove('hidden');
+            } else {
+                indicator.classList.add('hidden');
+            }
         }
 
         function selectUser(uid, name) {

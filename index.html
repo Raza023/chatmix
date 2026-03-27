@@ -154,8 +154,14 @@
             color: #4dff88;
         }
 
-        .status-dot-online { background: #10b981; box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
-        .status-dot-offline { background: #6b7280; }
+        .status-dot-online {
+            background: #10b981;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+        }
+
+        .status-dot-offline {
+            background: #6b7280;
+        }
 
         @keyframes slideIn {
             from {
@@ -201,7 +207,7 @@
             background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(10px);
             border: 1px solid var(--glass-border);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
         }
 
         /* Mobile Dynamic Height Fix */
@@ -520,7 +526,7 @@
                         <div id="emojiSuggestions" class="hidden absolute bottom-full left-6 right-6 p-2 mb-2 glass-panel rounded-xl border border-white/10 z-50 flex flex-col space-y-1"></div>
                     </div>
                     <div class="p-2 glass-panel mx-6 mb-6 rounded-2xl border border-white/10 flex items-center space-x-2 focus-within:ring-2 focus-within:ring-secondary transition-all">
-                        <input id="msg" oninput="handleEmojiInput()" onkeydown="if(event.key === 'Enter') sendMsg()" class="bg-black/40 border-none focus:ring-0 flex-1 p-3 text-white placeholder-white/30 font-medium rounded-xl" placeholder="Write something dope...">
+                        <input id="msg" oninput="handleEmojiInput()" onkeydown="handleMsgKeydown(event)" class="bg-black/40 border-none focus:ring-0 flex-1 p-3 text-white placeholder-white/30 font-medium rounded-xl" placeholder="Write something dope...">
                         <button onclick="sendMsg()" class="gradient-btn p-3 rounded-xl shadow-lg text-white group">
                             <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                         </button>
@@ -529,7 +535,7 @@
             </div>`;
 
             loadUsers();
-            
+
             // Request Browser Notification Permission
             if ("Notification" in window && Notification.permission !== "granted") {
                 Notification.requestPermission();
@@ -601,14 +607,14 @@
             let initialLoad = true;
             listeners[uid] = db.ref('messages/' + id).on('child_added', msgSnap => {
                 const msg = msgSnap.val();
-                
+
                 // If I receive a message and it's not marked as delivered (2) or seen (3)
                 if (msg.sender !== currentUser.uid && (!msg.status || msg.status < 2)) {
                     db.ref('messages/' + id + '/' + msgSnap.key).update({ status: 2 });
                 }
 
                 if (initialLoad) return;
-                
+
                 if (msg.sender !== currentUser.uid && uid !== selectedUser) {
                     unreadCounts[uid] = (unreadCounts[uid] || 0) + 1;
                     showToast(`New message from ${name}`, 'success');
@@ -649,7 +655,7 @@
 
             filteredUsers.forEach(u => {
                 const isOnline = u.lastSeen && (now - u.lastSeen < 60000);
-                const count =  unreadCounts[u.uid] || 0;
+                const count = unreadCounts[u.uid] || 0;
                 const div = document.createElement('div');
                 div.className = `p-4 user-item cursor-pointer flex items-center space-x-4 ${selectedUser === u.uid ? 'active' : ''}`;
                 div.innerHTML = `
@@ -679,7 +685,7 @@
         function selectUser(uid, name) {
             selectedUser = uid;
             document.getElementById('selectedUserName').innerText = name;
-            
+
             // Mobile Transition
             if (window.innerWidth < 768) {
                 document.getElementById('sidebarSection').classList.add('hidden');
@@ -765,12 +771,12 @@
             db.ref(newPath).on('value', snap => {
                 const chatBox = document.getElementById('chatBox');
                 if (!chatBox) return; // Guard for render switching
-                
+
                 chatBox.innerHTML = '';
 
                 let hasUnread = false;
                 const updates = {};
-                
+
                 chatBox.innerHTML = '';
 
                 snap.forEach(child => {
@@ -784,7 +790,7 @@
                     }
 
                     const ticks = isMine ? getTicks(m.status || 1) : '';
-                    
+
                     // Process Reacts
                     let reactionsHtml = '';
                     if (m.reactions) {
@@ -815,10 +821,10 @@
                                 `).join('')}
                             </div>
 
-                            ${m.text === ':tom_meme:' ? 
-                                `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg">` : 
-                                `<p class="text-sm font-medium leading-relaxed">${m.text}</p>`
-                            }
+                            ${m.text === ':tom_meme:' || m.text === ':tom_meme: ' ?
+                            `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg">` :
+                            `<p class="text-sm font-medium leading-relaxed">${m.text}</p>`
+                        }
                             ${reactionsHtml}
                             <div class="flex items-center justify-end space-x-1 mt-1 opacity-60">
                                 <p class="text-[10px]">${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
@@ -862,6 +868,9 @@
             ':tom_meme:': ':tom_meme:'
         };
 
+        let emojiIdx = 0;
+        let activeMatches = [];
+
         function handleEmojiInput() {
             const input = document.getElementById('msg');
             const div = document.getElementById('emojiSuggestions');
@@ -870,20 +879,50 @@
             const lastWord = words[words.length - 1];
 
             if (lastWord.startsWith(':') && lastWord.length >= 1) {
-                const matches = Object.entries(EMOJI_MAP).filter(([k]) => k.includes(lastWord));
-                if (matches.length > 0) {
-                    div.innerHTML = matches.map(([k, v]) => `
-                        <div onclick="applyEmoji('${k}')" class="p-2 hover:bg-white/10 rounded-lg cursor-pointer flex justify-between items-center text-sm">
-                            <span class="text-white/60">${k}</span>
-                            <span>${v === ':tom_meme:' ? '🐱' : v}</span>
-                        </div>
-                    `).join('');
+                activeMatches = Object.entries(EMOJI_MAP).filter(([k]) => k.includes(lastWord));
+                if (activeMatches.length > 0) {
+                    if (emojiIdx >= activeMatches.length) emojiIdx = 0;
+                    renderEmojiSuggestions();
                     div.classList.remove('hidden');
                 } else {
                     div.classList.add('hidden');
                 }
             } else {
                 div.classList.add('hidden');
+            }
+        }
+
+        function renderEmojiSuggestions() {
+            const div = document.getElementById('emojiSuggestions');
+            div.innerHTML = activeMatches.map(([k, v], i) => `
+                <div onclick="applyEmoji('${k}')" class="p-2 ${i === emojiIdx ? 'bg-white/20' : 'hover:bg-white/10'} rounded-lg cursor-pointer flex justify-between items-center text-sm transition-colors">
+                    <span class="${i === emojiIdx ? 'text-white' : 'text-white/60'}">${k}</span>
+                    <span>${v === ':tom_meme:' ? '🐱' : v}</span>
+                </div>
+            `).join('');
+        }
+
+        function handleMsgKeydown(e) {
+            const div = document.getElementById('emojiSuggestions');
+            const isVisible = !div.classList.contains('hidden');
+
+            if (isVisible) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    emojiIdx = (emojiIdx + 1) % activeMatches.length;
+                    renderEmojiSuggestions();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    emojiIdx = (emojiIdx - 1 + activeMatches.length) % activeMatches.length;
+                    renderEmojiSuggestions();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyEmoji(activeMatches[emojiIdx][0]);
+                } else if (e.key === 'Escape') {
+                    div.classList.add('hidden');
+                }
+            } else if (e.key === 'Enter') {
+                sendMsg();
             }
         }
 

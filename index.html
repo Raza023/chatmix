@@ -626,16 +626,11 @@
                 renderUserList();
             });
 
-            // Identify active chats (only those with messages)
-            db.ref('messages').on('value', snap => {
+            // Identify active chats (only those with messages I'm part of)
+            db.ref('user_chats/' + currentUser.uid).on('value', snap => {
                 activeChatUids.clear();
-                snap.forEach(chatRoom => {
-                    const id = chatRoom.key;
-                    if (id.includes(currentUser.uid)) {
-                        const parts = id.split('_');
-                        const otherUid = parts[0] === currentUser.uid ? parts[1] : parts[0];
-                        activeChatUids.add(otherUid);
-                    }
+                snap.forEach(child => {
+                    activeChatUids.add(child.key);
                 });
                 renderUserList();
             });
@@ -824,6 +819,11 @@
                 time: Date.now(),
                 status: 1
             });
+            
+            // Index the chat for sidebar visibility
+            db.ref('user_chats/' + currentUser.uid + '/' + selectedUser).set(true);
+            db.ref('user_chats/' + selectedUser + '/' + currentUser.uid).set(true);
+
             db.ref('users/' + currentUser.uid).update({ lastSeen: Date.now() });
         }
 
@@ -846,6 +846,10 @@
                 time: Date.now(),
                 status: 1 // Sent
             });
+
+            // Index the chat for sidebar visibility
+            db.ref('user_chats/' + currentUser.uid + '/' + selectedUser).set(true);
+            db.ref('user_chats/' + selectedUser + '/' + currentUser.uid).set(true);
 
             // Update status on message send
             db.ref('users/' + currentUser.uid).update({ lastSeen: Date.now() });

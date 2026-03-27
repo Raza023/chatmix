@@ -706,7 +706,9 @@
             usersDiv.innerHTML = '';
 
             const filteredUsers = usersData.filter(u => {
-                const matchesSearch = u.email.toLowerCase().includes(searchQuery) || u.name.toLowerCase().includes(searchQuery);
+                const name = u.name || '';
+                const email = u.email || '';
+                const matchesSearch = email.toLowerCase().includes(searchQuery) || name.toLowerCase().includes(searchQuery);
                 if (searchQuery) return matchesSearch;
                 return activeChatUids.has(u.uid);
             });
@@ -719,21 +721,23 @@
             }
 
             filteredUsers.forEach(u => {
+                const now = Date.now();
                 const isOnline = u.lastSeen && (now - u.lastSeen < 60000);
                 const isTyping = typingUsers[u.uid];
                 const count = unreadCounts[u.uid] || 0;
+                const name = u.name || 'Anonymous User';
                 const div = document.createElement('div');
                 div.className = `p-4 user-item cursor-pointer flex items-center space-x-4 ${selectedUser === u.uid ? 'active' : ''}`;
                 div.innerHTML = `
                     <div class="relative">
                         <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold border border-white/10 text-white">
-                            ${escapeHTML(u.name)[0].toUpperCase()}
+                            ${escapeHTML(name)[0].toUpperCase()}
                         </div>
                         ${count > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#1a1a1a] animate-bounce">${count}</div>` : ''}
                         <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#1a1a1a] ${isOnline ? 'status-dot-online' : 'status-dot-offline'}"></div>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="font-semibold text-white truncate">${escapeHTML(u.name)}</p>
+                        <p class="font-semibold text-white truncate">${escapeHTML(name)}</p>
                         ${isTyping ? `
                             <p class="text-xs text-secondary italic font-medium typing-dots">Typing<span>.</span><span>.</span><span>.</span></p>
                         ` : `

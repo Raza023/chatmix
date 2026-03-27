@@ -805,7 +805,10 @@
                                 `).join('')}
                             </div>
 
-                            <p class="text-sm font-medium leading-relaxed">${m.text}</p>
+                            ${m.text === ':tom_meme:' ? 
+                                `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg">` : 
+                                `<p class="text-sm font-medium leading-relaxed">${m.text}</p>`
+                            }
                             ${reactionsHtml}
                             <div class="flex items-center justify-end space-x-1 mt-1 opacity-60">
                                 <p class="text-[10px]">${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>

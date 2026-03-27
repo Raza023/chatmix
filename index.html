@@ -461,10 +461,6 @@
                             email: tempEmail,
                             name: data.name
                         });
-
-                        // Delete pending entry after successful verification & account creation
-                        db.ref('pendingUsers/' + tempEmail.replace('.', '_')).remove();
-
                         showToast('Account created successfully!', 'success');
                         setCookie('chatmix_logged_in', userCred.user.uid, 20);
                         currentUser = userCred.user;
@@ -525,10 +521,10 @@
                     <div class="p-4 glass-panel mt-auto border-t border-white/10">
                         <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center font-bold">
-                                ${(currentUser.email || 'U')[0].toUpperCase()}
+                                ${currentUser.email[0].toUpperCase()}
                             </div>
                             <div class="truncate">
-                                <p class="font-semibold text-sm">${currentUser.email || 'Anonymous'}</p>
+                                <p class="font-semibold text-sm">${currentUser.email}</p>
                                 <p class="text-xs text-green-400">Online</p>
                             </div>
                         </div>
@@ -626,11 +622,16 @@
                 renderUserList();
             });
 
-            // Identify active chats (only those with messages I'm part of)
-            db.ref('user_chats/' + currentUser.uid).on('value', snap => {
+            // Identify active chats (only those with messages)
+            db.ref('messages').on('value', snap => {
                 activeChatUids.clear();
-                snap.forEach(child => {
-                    activeChatUids.add(child.key);
+                snap.forEach(chatRoom => {
+                    const id = chatRoom.key;
+                    if (id.includes(currentUser.uid)) {
+                        const parts = id.split('_');
+                        const otherUid = parts[0] === currentUser.uid ? parts[1] : parts[0];
+                        activeChatUids.add(otherUid);
+                    }
                 });
                 renderUserList();
             });
@@ -705,9 +706,7 @@
             usersDiv.innerHTML = '';
 
             const filteredUsers = usersData.filter(u => {
-                const name = u.name || '';
-                const email = u.email || '';
-                const matchesSearch = email.toLowerCase().includes(searchQuery) || name.toLowerCase().includes(searchQuery);
+                const matchesSearch = u.email.toLowerCase().includes(searchQuery) || u.name.toLowerCase().includes(searchQuery);
                 if (searchQuery) return matchesSearch;
                 return activeChatUids.has(u.uid);
             });
@@ -720,23 +719,21 @@
             }
 
             filteredUsers.forEach(u => {
-                const now = Date.now();
                 const isOnline = u.lastSeen && (now - u.lastSeen < 60000);
                 const isTyping = typingUsers[u.uid];
                 const count = unreadCounts[u.uid] || 0;
-                const name = u.name || 'Anonymous User';
                 const div = document.createElement('div');
                 div.className = `p-4 user-item cursor-pointer flex items-center space-x-4 ${selectedUser === u.uid ? 'active' : ''}`;
                 div.innerHTML = `
                     <div class="relative">
                         <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold border border-white/10 text-white">
-                            ${escapeHTML(name)[0].toUpperCase()}
+                            ${escapeHTML(u.name)[0].toUpperCase()}
                         </div>
                         ${count > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#1a1a1a] animate-bounce">${count}</div>` : ''}
                         <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#1a1a1a] ${isOnline ? 'status-dot-online' : 'status-dot-offline'}"></div>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="font-semibold text-white truncate">${escapeHTML(name)}</p>
+                        <p class="font-semibold text-white truncate">${escapeHTML(u.name)}</p>
                         ${isTyping ? `
                             <p class="text-xs text-secondary italic font-medium typing-dots">Typing<span>.</span><span>.</span><span>.</span></p>
                         ` : `
@@ -819,11 +816,6 @@
                 time: Date.now(),
                 status: 1
             });
-            
-            // Index the chat for sidebar visibility
-            db.ref('user_chats/' + currentUser.uid + '/' + selectedUser).set(true);
-            db.ref('user_chats/' + selectedUser + '/' + currentUser.uid).set(true);
-
             db.ref('users/' + currentUser.uid).update({ lastSeen: Date.now() });
         }
 
@@ -846,10 +838,6 @@
                 time: Date.now(),
                 status: 1 // Sent
             });
-
-            // Index the chat for sidebar visibility
-            db.ref('user_chats/' + currentUser.uid + '/' + selectedUser).set(true);
-            db.ref('user_chats/' + selectedUser + '/' + currentUser.uid).set(true);
 
             // Update status on message send
             db.ref('users/' + currentUser.uid).update({ lastSeen: Date.now() });
@@ -948,12 +936,12 @@
                             </div>
 
                             ${m.type === 'image' ?
-                            `<img src="${m.text}" class="w-full max-w-[300px] rounded-xl border border-white/10 shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer" onclick="window.open('${m.text}', '_blank')">` :
-                            (m.text === ':tom_meme:' ?
-                                `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg house-meme">` :
-                                `<p class="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(m.text)}</p>`
-                            )
-                        }
+                                `<img src="${m.text}" class="w-full max-w-[300px] rounded-xl border border-white/10 shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer" onclick="window.open('${m.text}', '_blank')">` :
+                                (m.text === ':tom_meme:' ?
+                                    `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg house-meme">` :
+                                    `<p class="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(m.text)}</p>`
+                                )
+                            }
                             ${reactionsHtml}
                             <div class="flex items-center justify-end space-x-1 mt-1 opacity-60">
                                 <p class="text-[10px]">${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>

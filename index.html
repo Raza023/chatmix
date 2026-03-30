@@ -550,11 +550,15 @@
                             <h3 class="font-bold text-lg text-white" id="selectedUserName">Select a contact</h3>
                         </div>
                         <div id="chatActions" class="flex space-x-2 hidden">
+                            <button onclick="startAudioCall()" class="p-2 hover:bg-green-500/20 rounded-full transition text-green-400" title="Audio Call">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                            </button>
+                            <button class="p-2 hover:bg-white/10 rounded-full transition text-white/70 hover:text-white" title="Video Call">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                            </button>
+                            <div class="w-px h-6 bg-white/10 mx-1"></div>
                             <button onclick="deleteChat()" class="p-2 hover:bg-red-500/20 rounded-full transition text-red-400 group" title="Delete conversation">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
-                            </button>
-                            <button class="p-2 hover:bg-white/10 rounded-full transition text-white/70 hover:text-white">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                             </button>
                         </div>
                     </div>
@@ -598,6 +602,30 @@
             </div>`;
 
             loadUsers();
+            initCallListener();
+
+            // Audio call modal HTML
+            const modalHtml = `
+            <div id="callModal" class="fixed inset-0 z-[100] hidden bg-black/60 backdrop-blur-xl flex items-center justify-center animate-fade-in p-4">
+                <div class="glass-panel w-full max-w-sm rounded-[3rem] p-10 flex flex-col items-center border border-white/20 shadow-2xl relative overflow-hidden">
+                    <div class="relative mb-10">
+                        <div class="absolute inset-0 animate-ping rounded-full bg-secondary/20 duration-[2000ms]"></div>
+                        <div class="w-32 h-32 rounded-full gradient-btn flex items-center justify-center text-4xl font-black text-white shadow-neo relative z-10 border-4 border-white/10" id="callAvatar">--</div>
+                    </div>
+                    <h2 class="text-2xl font-black text-white mb-2" id="callName">Contact Name</h2>
+                    <p class="text-secondary font-bold tracking-widest uppercase text-xs mb-10 animate-pulse" id="callStatus">Calling...</p>
+                    <div class="flex items-center space-x-6 w-full justify-center">
+                        <button onclick="rejectCall()" class="bg-red-500 hover:bg-red-600 p-6 rounded-full text-white shadow-xl transform active:scale-95 transition-all">
+                            <svg class="w-8 h-8 rotate-[135deg]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                        </button>
+                        <button onclick="acceptCall()" id="acceptBtn" class="bg-green-500 hover:bg-green-600 p-6 rounded-full text-white shadow-xl transform active:scale-95 transition-all hidden">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                        </button>
+                    </div>
+                    <audio id="remoteAudio" autoplay class="hidden"></audio>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
 
             // Request Browser Notification Permission
             if ("Notification" in window && Notification.permission !== "granted") {
@@ -615,6 +643,12 @@
         let typingUsers = {}; // uid -> boolean
         let typingTimer;
         let replyingTo = null; // { id, text, sender }
+
+        // WebRTC Variables
+        let pc = null;
+        let localStream = null;
+        let currentCallId = null;
+        const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
         function handleTypingStatus() {
             if (!selectedUser) return;
@@ -1120,6 +1154,166 @@
                     behavior: 'smooth'
                 });
             }
+        }
+
+        /* --- Audio Calling System --- */
+
+        function initCallListener() {
+            // Listen for incoming call requests to ME
+            db.ref('calls').on('child_added', snap => {
+                const call = snap.val();
+                if (call.to === currentUser.uid && call.status === 'offered') {
+                    showIncomingCall(snap.key, call.from);
+                }
+            });
+        }
+
+        async function startAudioCall() {
+            if (!selectedUser) return;
+            const name = document.getElementById('selectedUserName').innerText;
+            
+            // UI
+            document.getElementById('callModal').classList.remove('hidden');
+            document.getElementById('callAvatar').innerText = name.split(' ').map(n=>n[0]).join('');
+            document.getElementById('callName').innerText = name;
+            document.getElementById('callStatus').innerText = 'Calling...';
+            document.getElementById('acceptBtn').classList.add('hidden');
+
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                pc = new RTCPeerConnection(config);
+                localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+                pc.onicecandidate = e => {
+                    if (e.candidate) {
+                        db.ref(`calls/${currentCallId}/candidates`).push(e.candidate.toJSON());
+                    }
+                };
+
+                pc.ontrack = e => {
+                    document.getElementById('remoteAudio').srcObject = e.streams[0];
+                };
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                const callRef = db.ref('calls').push();
+                currentCallId = callRef.key;
+                await callRef.set({
+                    from: currentUser.uid,
+                    to: selectedUser,
+                    offer: { sdp: offer.sdp, type: offer.type },
+                    status: 'offered',
+                    timestamp: Date.now()
+                });
+
+                // Listen for answer
+                db.ref(`calls/${currentCallId}`).on('value', async s => {
+                    const data = s.val();
+                    if (data && data.status === 'answered' && !pc.currentRemoteDescription) {
+                        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                        document.getElementById('callStatus').innerText = 'Connected';
+                    } else if (data && data.status === 'rejected') {
+                        endCallUI();
+                    }
+                });
+
+                // Add candidates
+                db.ref(`calls/${currentCallId}/candidates`).on('child_added', s => {
+                    if (s.val().from !== currentUser.uid) {
+                        pc.addIceCandidate(new RTCIceCandidate(s.val()));
+                    }
+                });
+
+            } catch (err) {
+                showToast("Microphone access required for calls.");
+                endCallUI();
+            }
+        }
+
+        async function showIncomingCall(callId, fromUid) {
+            currentCallId = callId;
+            const data = usersData.find(u => u.uid === fromUid);
+            const name = data ? data.name : 'Unknown';
+
+            document.getElementById('callModal').classList.remove('hidden');
+            document.getElementById('callAvatar').innerText = name.split(' ').map(n=>n[0]).join('');
+            document.getElementById('callName').innerText = name;
+            document.getElementById('callStatus').innerText = 'Incoming Call...';
+            document.getElementById('acceptBtn').classList.remove('hidden');
+
+            // Sound
+            const audio = new Audio('https://assets.mixkit.net/sfx/preview/mixkit-modern-classic-door-bell-sound-113.mp3');
+            audio.play();
+
+            // Auto-reject listener
+            db.ref(`calls/${callId}`).on('value', s => {
+                if (!s.exists() || (s.val().status === 'rejected')) endCallUI();
+            });
+        }
+
+        async function acceptCall() {
+            document.getElementById('callStatus').innerText = 'Connecting...';
+            document.getElementById('acceptBtn').classList.add('hidden');
+
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                pc = new RTCPeerConnection(config);
+                localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+                pc.onicecandidate = e => {
+                    if (e.candidate) {
+                        db.ref(`calls/${currentCallId}/candidates`).push({ ...e.candidate.toJSON(), from: currentUser.uid });
+                    }
+                };
+
+                pc.ontrack = e => {
+                    document.getElementById('remoteAudio').srcObject = e.streams[0];
+                };
+
+                const callSnap = await db.ref(`calls/${currentCallId}`).once('value');
+                const callData = callSnap.val();
+
+                await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+
+                await db.ref(`calls/${currentCallId}`).update({
+                    answer: { sdp: answer.sdp, type: answer.type },
+                    status: 'answered'
+                });
+
+                // Candidates listener
+                db.ref(`calls/${currentCallId}/candidates`).on('child_added', s => {
+                    const candid = s.val();
+                    if (candid.from !== currentUser.uid) {
+                        pc.addIceCandidate(new RTCIceCandidate(candid));
+                    }
+                });
+
+                document.getElementById('callStatus').innerText = 'Connected';
+
+            } catch (err) {
+                showToast("Microphone error.");
+                rejectCall();
+            }
+        }
+
+        function rejectCall() {
+            if (currentCallId) {
+                db.ref(`calls/${currentCallId}`).update({ status: 'rejected' });
+                db.ref(`calls/${currentCallId}`).remove();
+            }
+            endCallUI();
+        }
+
+        function endCallUI() {
+            document.getElementById('callModal').classList.add('hidden');
+            if (localStream) localStream.getTracks().forEach(t => t.stop());
+            if (pc) pc.close();
+            pc = null;
+            localStream = null;
+            currentCallId = null;
         }
 
         function getTicks(status) {

@@ -1213,15 +1213,16 @@
                     if (data && data.status === 'answered' && !pc.currentRemoteDescription) {
                         await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
                         document.getElementById('callStatus').innerText = 'Connected';
+
+                        // Candidates must only be added AFTER remote description is set
+                        db.ref(`calls/${currentCallId}/candidates`).on('child_added', snap => {
+                            const candid = snap.val();
+                            if (candid.from !== currentUser.uid && pc.remoteDescription) {
+                                pc.addIceCandidate(new RTCIceCandidate(candid)).catch(e => console.warn("ICE Error:", e));
+                            }
+                        });
                     } else if (data && data.status === 'rejected') {
                         endCallUI();
-                    }
-                });
-
-                // Add candidates
-                db.ref(`calls/${currentCallId}/candidates`).on('child_added', s => {
-                    if (s.val().from !== currentUser.uid) {
-                        pc.addIceCandidate(new RTCIceCandidate(s.val()));
                     }
                 });
 
@@ -1283,11 +1284,11 @@
                     status: 'answered'
                 });
 
-                // Candidates listener
+                // Candidates listener - start after remote description is ready
                 db.ref(`calls/${currentCallId}/candidates`).on('child_added', s => {
                     const candid = s.val();
-                    if (candid.from !== currentUser.uid) {
-                        pc.addIceCandidate(new RTCIceCandidate(candid));
+                    if (candid.from !== currentUser.uid && pc.remoteDescription) {
+                        pc.addIceCandidate(new RTCIceCandidate(candid)).catch(e => console.warn("ICE Error:", e));
                     }
                 });
 

@@ -570,6 +570,16 @@
                         <span id="typingText"></span>
                     </div>
 
+                    <div id="replyPreview" class="hidden mx-6 mb-2 glass-panel p-3 rounded-xl border-l-4 border-secondary flex items-center justify-between animate-fade-in">
+                        <div class="flex-1 min-w-0 pr-4">
+                            <p id="replyUser" class="text-xs font-bold text-secondary mb-0.5"></p>
+                            <p id="replyText" class="text-xs text-white/50 truncate"></p>
+                        </div>
+                        <button onclick="cancelReply()" class="p-1 hover:bg-white/10 rounded-full text-white/40 hover:text-white">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                        </button>
+                    </div>
+
                     <div class="relative px-6 mb-2">
                         <div id="emojiSuggestions" class="hidden absolute bottom-full left-6 right-6 p-2 mb-2 glass-panel rounded-xl border border-white/10 z-50 flex flex-col space-y-1"></div>
                     </div>
@@ -599,6 +609,7 @@
         let searchQuery = '';
         let typingUsers = {}; // uid -> boolean
         let typingTimer;
+        let replyingTo = null; // { id, text, sender }
 
         function handleTypingStatus() {
             if (!selectedUser) return;
@@ -866,14 +877,20 @@
                 }
             });
 
-            const id = chatId(currentUser.uid, selectedUser);
-
-            db.ref('messages/' + id).push({
+            const payload = {
                 sender: currentUser.uid,
                 text: msg,
                 time: Date.now(),
                 status: 1 // Sent
-            });
+            };
+
+            if (replyingTo) {
+                payload.replyTo = replyingTo.id;
+                cancelReply();
+            }
+
+            const id = chatId(currentUser.uid, selectedUser);
+            db.ref('messages/' + id).push(payload);
 
             // Index for sidebar visibility under secure rules
             db.ref('user_chats/' + currentUser.uid + '/' + selectedUser).set(true);
@@ -936,6 +953,10 @@
                 const updates = {};
                 const currentKeys = new Set();
                 const wasAtBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 100;
+                
+                // Build message map for fast reply lookup
+                const msgMap = {};
+                snap.forEach(child => { msgMap[child.key] = child.val(); });
 
                 snap.forEach(child => {
                     const m = child.val();
@@ -964,30 +985,51 @@
                         </div>`;
                     }
 
+                    // Process Quote
+                    let quoteHtml = '';
+                    if (m.replyTo && msgMap[m.replyTo]) {
+                        const parent = msgMap[m.replyTo];
+                        quoteHtml = `
+                            <div onclick="scrollToMessage('${m.replyTo}')" class="bg-black/20 border-l-2 border-secondary/50 p-2 rounded-lg mb-2 cursor-pointer hover:bg-black/30 transition-all">
+                                <p class="text-[10px] font-bold text-secondary uppercase tracking-wider">Replied to</p>
+                                <p class="text-xs text-white/60 truncate">${parent.type === 'image' ? 'Sent a photo' : escapeHTML(parent.text)}</p>
+                            </div>
+                        `;
+                    }
+
+                    const senderName = isMine ? 'You' : (document.getElementById('selectedUserName').innerText);
+
                     const innerContent = `
-                        <div class="max-w-[85%] md:max-w-md p-4 group relative ${isMine ? 'chat-bubble-mine' : 'chat-bubble-theirs'}">
+                        <div class="max-w-[85%] md:max-w-md group relative">
                             ${isMine ? `
                             <button onclick="deleteMsg('${key}')" class="absolute -bottom-2 -left-2 p-1.5 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg cursor-pointer transform hover:scale-110 active:scale-90 z-20">
                                 <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                             </button>` : ''}
                             
-                            <div class="absolute -top-8 ${isMine ? 'right-0' : 'left-0'} flex space-x-1 p-1.5 rounded-2xl reaction-picker opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 z-30 pointer-events-none group-hover:pointer-events-auto">
+                            <div class="absolute -top-8 ${isMine ? 'right-0' : 'left-0'} flex space-x-1 p-1.5 rounded-2xl reaction-picker opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 z-30 pointer-events-none group-hover:pointer-events-auto shadow-xl ring-1 ring-white/10">
+                                <button onclick="setReply('${key}', '${m.type === 'image' ? 'Image' : escapeHTML(m.text).replace(/'/g, "\\'")}', '${senderName}')" class="p-1 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                                </button>
+                                <div class="w-px h-4 bg-white/10 mx-1"></div>
                                 ${['👍', '❤️', '🥶', '😂', '😮', '😢'].map(e => `
                                     <span onclick="reactToMsg('${key}', '${e}')" class="cursor-pointer hover:scale-125 transition-transform px-1">${e}</span>
                                 `).join('')}
                             </div>
 
-                            ${m.type === 'image' ?
-                                `<img src="${m.text}" class="w-full max-w-[300px] rounded-xl border border-white/10 shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer" onclick="window.open('${m.text}', '_blank')">` :
-                                (m.text === ':tom_meme:' ?
-                                    `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg house-meme">` :
-                                    `<p class="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(m.text)}</p>`
-                                )
-                            }
-                            ${reactionsHtml}
-                            <div class="flex items-center justify-end space-x-1 mt-1 opacity-60">
-                                <p class="text-[10px]">${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                ${ticks}
+                            <div class="p-4 rounded-3xl ${isMine ? 'chat-bubble-mine rounded-br-none' : 'chat-bubble-theirs rounded-bl-none'} shadow-lg border border-white/5">
+                                ${quoteHtml}
+                                ${m.type === 'image' ?
+                                    `<img src="${m.text}" class="w-full max-w-[300px] rounded-xl border border-white/10 shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer" onclick="window.open('${m.text}', '_blank')">` :
+                                    (m.text === ':tom_meme:' ?
+                                        `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg house-meme">` :
+                                        `<p class="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(m.text)}</p>`
+                                    )
+                                }
+                                ${reactionsHtml}
+                                <div class="flex items-center justify-end space-x-1 mt-1 opacity-60">
+                                    <p class="text-[10px]">${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                    ${ticks}
+                                </div>
                             </div>
                         </div>
                     `;
@@ -1026,6 +1068,30 @@
                     db.ref(newPath).update(updates);
                 }
             });
+        }
+
+        function setReply(id, text, sender) {
+            replyingTo = { id, text, sender };
+            document.getElementById('replyUser').innerText = sender;
+            document.getElementById('replyText').innerText = text;
+            document.getElementById('replyPreview').classList.remove('hidden');
+            document.getElementById('msg').focus();
+        }
+
+        function cancelReply() {
+            replyingTo = null;
+            document.getElementById('replyPreview').classList.add('hidden');
+        }
+
+        function scrollToMessage(id) {
+            const el = document.getElementById('msg-' + id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('ring-2', 'ring-secondary', 'duration-500');
+                setTimeout(() => el.classList.remove('ring-2', 'ring-secondary'), 2000);
+            } else {
+                showToast('Original message not found in history.');
+            }
         }
 
         function getTicks(status) {

@@ -3,7 +3,6 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://cdn.tailwindcss.com https://www.gstatic.com https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://survey-b6afd-default-rtdb.asia-southeast1.firebasedatabase.app https://survey-b6afd.firebaseapp.com https://api.emailjs.com https://assets.mixkit.co; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://www.gstatic.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://api.emailjs.com https://assets.mixkit.co; media-src 'self' https://assets.mixkit.co; img-src 'self' data:;">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ChatMix | Connect Seamlessly</title>
     <link rel="icon" type="image/png" href="./logo.png">
@@ -254,20 +253,15 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
 
     <script>
-        // ===== SECURITY: Disable console & block script injection =====
-        (function() {
-            const noop = () => {};
-            const methods = ['log','warn','error','info','debug','table','dir','dirxml','group','groupEnd','time','timeEnd','assert','profile','profileEnd','count','clear'];
-            methods.forEach(m => { try { console[m] = noop; } catch(e) {} });
-            // Override console object itself
-            Object.defineProperty(window, 'console', {
-                get: function() { return { log:noop,warn:noop,error:noop,info:noop,debug:noop,table:noop,dir:noop,assert:noop }; },
-                set: noop
-            });
-        })();
-
         (function () {
             emailjs.init("La4jKdbxwJ4KsEEhr");
+
+            // Disable Console Logging for Security
+            const noop = () => {};
+            window.console.log = noop;
+            window.console.warn = noop;
+            window.console.error = noop;
+            window.console.info = noop;
         })();
 
         // Cookie Management Helpers
@@ -376,8 +370,8 @@
                     <p class="text-gray-400 mt-2">Welcome back! Please login.</p>
                 </div>
                 <div class="space-y-4">
-                    <input id="email" type="email" maxlength="100" autocomplete="email" class="glass-input p-4 w-full rounded-xl" placeholder="Email Address">
-                    <input id="password" type="password" maxlength="64" onkeydown="if(event.key === 'Enter') login()" autocomplete="current-password" class="glass-input p-4 w-full rounded-xl" placeholder="Password">
+                    <input id="email" maxlength="100" class="glass-input p-4 w-full rounded-xl" placeholder="Email Address">
+                    <input id="password" maxlength="50" type="password" onkeydown="if(event.key === 'Enter') login()" class="glass-input p-4 w-full rounded-xl" placeholder="Password">
                     <button onclick="login()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg mt-4">Login</button>
                     <p class="text-center mt-6 text-sm text-gray-400">
                         Don't have an account? <span onclick="renderSignup()" class="text-purple-400 cursor-pointer hover:underline font-semibold">Sign up</span>
@@ -395,8 +389,8 @@
                     <p class="text-gray-400 mt-2">Create your account to start mixing.</p>
                 </div>
                 <div class="space-y-4">
-                    <input id="email" type="email" maxlength="100" autocomplete="email" class="glass-input p-4 w-full rounded-xl" placeholder="Email">
-                    <input id="name" maxlength="30" onkeydown="if(event.key === 'Enter') sendCode()" autocomplete="nickname" class="glass-input p-4 w-full rounded-xl" placeholder="Alias (Display Name)">
+                    <input id="email" maxlength="100" class="glass-input p-4 w-full rounded-xl" placeholder="Email">
+                    <input id="name" maxlength="50" onkeydown="if(event.key === 'Enter') sendCode()" class="glass-input p-4 w-full rounded-xl" placeholder="Alias (Display Name)">
                     <button onclick="sendCode()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg mt-4">Send Verification Code</button>
                     <p class="text-center mt-4 text-sm text-gray-400">
                         Already have an account? <span onclick="renderLogin()" class="text-purple-400 cursor-pointer hover:underline">Login</span>
@@ -405,29 +399,10 @@
             </div>`;
         }
 
-        // Sanitize: strip all HTML tags and trim whitespace
-        function sanitizeInput(str) {
-            return str.replace(/<[^>]*>/g, '').replace(/[<>"'`]/g, '').trim();
-        }
-
         function sendCode() {
-            const rawEmail = document.getElementById('email').value.trim();
-            const rawName  = document.getElementById('name').value.trim();
-
-            if (!rawEmail || !rawName) return showToast('Please fill all fields to continue.');
-
-            // Email format validation
-            const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
-            if (!emailRegex.test(rawEmail) || rawEmail.length > 100)
-                return showToast('Please enter a valid email address.');
-
-            // Name: letters, numbers, spaces, common symbols only. Max 30 chars.
-            const nameRegex = /^[a-zA-Z0-9 _\-\.]{1,30}$/;
-            if (!nameRegex.test(rawName))
-                return showToast('Display name must be 1–30 characters (letters, numbers, spaces only).');
-
-            tempEmail = rawEmail;
-            const name = sanitizeInput(rawName);
+            tempEmail = document.getElementById('email').value;
+            const name = document.getElementById('name').value;
+            if (!tempEmail || !name) return showToast('Please fill all fields to continue.');
 
             verificationCode = Math.floor(1000 + Math.random() * 9000);
 
@@ -440,6 +415,7 @@
             emailjs.send("service_ijfry7u", "template_igxg83j", templateParams)
                 .then(function () {
                     showToast('Verification code sent to email!', 'success');
+
                     db.ref('pendingUsers/' + tempEmail.replace('.', '_')).set({ name, code: verificationCode });
                     renderVerify();
                 }, function (error) {
@@ -452,17 +428,13 @@
             <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in">
                 <h2 class="text-2xl font-bold mb-6 text-center">Verify Identity</h2>
                 <p class="text-gray-400 mb-6 text-center">Enter the 4-digit code sent to your email.</p>
-                <input id="code" type="text" maxlength="4" inputmode="numeric" pattern="[0-9]{4}" onkeydown="if(event.key === 'Enter') verifyCode()" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)" class="glass-input p-4 w-full rounded-xl text-center text-2xl tracking-widest mb-4" placeholder="0000">
+                <input id="code" maxlength="4" onkeydown="if(event.key === 'Enter') verifyCode()" class="glass-input p-4 w-full rounded-xl text-center text-2xl tracking-widest mb-4" placeholder="0000">
                 <button onclick="verifyCode()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">Verify & Continue</button>
             </div>`;
         }
 
         function verifyCode() {
-            const entered = document.getElementById('code').value.trim();
-
-            // Must be exactly 4 digits
-            if (!/^[0-9]{4}$/.test(entered))
-                return showToast('Please enter the 4-digit code from your email.');
+            const entered = document.getElementById('code').value;
 
             db.ref('pendingUsers/' + tempEmail.replace('.', '_')).once('value', snap => {
                 const data = snap.val();
@@ -479,18 +451,13 @@
             app.innerHTML = `
             <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in">
                 <h2 class="text-2xl font-bold mb-6 text-center">Secure Your Account</h2>
-                <input id="password" type="password" maxlength="64" minlength="8" onkeydown="if(event.key === 'Enter') createAccount()" autocomplete="new-password" class="glass-input p-4 w-full rounded-xl mb-4" placeholder="Strong Password (min 8 characters)">
+                <input id="password" maxlength="50" onkeydown="if(event.key === 'Enter') createAccount()" type="password" class="glass-input p-4 w-full rounded-xl mb-4" placeholder="Strong Password">
                 <button onclick="createAccount()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">Complete Registration</button>
             </div>`;
         }
 
         function createAccount() {
             const password = document.getElementById('password').value;
-
-            if (!password || password.length < 8)
-                return showToast('Password must be at least 8 characters long.');
-            if (password.length > 64)
-                return showToast('Password must not exceed 64 characters.');
 
             db.ref('pendingUsers/' + tempEmail.replace('.', '_')).once('value', snap => {
                 const data = snap.val();
@@ -511,21 +478,13 @@
         }
 
         function login() {
-            const email    = document.getElementById('email').value.trim();
+            const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-
-            // Client-side guards
-            const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
-            if (!emailRegex.test(email) || email.length > 100)
-                return showToast('Please enter a valid email address.');
-            if (!password || password.length < 8)
-                return showToast('Password must be at least 8 characters.');
-            if (password.length > 64)
-                return showToast('Password is too long.');
 
             auth.signInWithEmailAndPassword(email, password)
                 .then(userCred => {
                     const uid = userCred.user.uid;
+                    // Check if user is actually authorized in our database users node
                     db.ref('users/' + uid).once('value', snap => {
                         if (snap.exists()) {
                             currentUser = userCred.user;
@@ -581,7 +540,7 @@
                                 ${currentUser.email[0].toUpperCase()}
                             </div>
                             <div class="truncate">
-                                <p class="font-semibold text-sm">${currentUser.email}</p>
+                                <p class="font-semibold text-sm">${escapeHTML(currentUser.email)}</p>
                                 <p class="text-xs text-green-400">Online</p>
                             </div>
                         </div>
@@ -870,7 +829,7 @@
             if (!indicator || !selectedUser) return;
 
             if (typingUsers[selectedUser]) {
-                const name = escapeHTML(document.getElementById('selectedUserName').innerText);
+                const name = document.getElementById('selectedUserName').innerText;
                 typingText.innerHTML = `${name} is typing<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>`;
                 indicator.classList.remove('hidden');
             } else {
@@ -939,15 +898,6 @@
 
         function sendImageMsg(dataUrl) {
             if (!selectedUser) return;
-            // Security: only allow genuine image data URLs
-            if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
-                return showToast('Only image files are allowed.');
-            }
-            // Max image size ~4MB base64
-            if (dataUrl.length > 5500000) {
-                return showToast('Image is too large. Please use a smaller file.');
-            }
-
             const id = chatId(currentUser.uid, selectedUser);
             db.ref('messages/' + id).push({
                 sender: currentUser.uid,
@@ -957,19 +907,16 @@
                 status: 1
             });
             
+            // Index for sidebar visibility under secure rules
             db.ref('user_chats/' + currentUser.uid + '/' + selectedUser).set(true);
             db.ref('user_chats/' + selectedUser + '/' + currentUser.uid).set(true);
+
             db.ref('users/' + currentUser.uid).update({ lastSeen: Date.now() });
         }
 
         function sendMsg() {
             let msg = document.getElementById('msg').value;
             if (!msg || !selectedUser) return;
-
-            // Trim and strip HTML tags before any processing
-            msg = sanitizeInput(msg);
-
-            if (!msg) return;
 
             if (msg.length > 1500) {
                 return showToast('Message is too long. Limit is 1500 characters.');

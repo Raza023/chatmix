@@ -1159,11 +1159,11 @@
         /* --- Audio Calling System --- */
 
         function initCallListener() {
-            // Listen for incoming call requests to ME
-            db.ref('calls').on('child_added', snap => {
-                const call = snap.val();
-                if (call.to === currentUser.uid && call.status === 'offered') {
-                    showIncomingCall(snap.key, call.from);
+            // Listen for private incoming call notifications in MY inbox
+            db.ref('user_calls/' + currentUser.uid).on('value', snap => {
+                const data = snap.val();
+                if (data && data.status === 'offered') {
+                    showIncomingCall(data.callId, data.from);
                 }
             });
         }
@@ -1199,12 +1199,22 @@
 
                 const callRef = db.ref('calls').push();
                 currentCallId = callRef.key;
-                await callRef.set({
+                
+                const callData = {
                     from: currentUser.uid,
                     to: selectedUser,
                     offer: { sdp: offer.sdp, type: offer.type },
                     status: 'offered',
                     timestamp: Date.now()
+                };
+
+                await callRef.set(callData);
+
+                // Notify RECIPIENT through their private inbox
+                db.ref('user_calls/' + selectedUser).set({
+                    callId: currentCallId,
+                    from: currentUser.uid,
+                    status: 'offered'
                 });
 
                 // Listen for answer
@@ -1213,6 +1223,9 @@
                     if (data && data.status === 'answered' && !pc.currentRemoteDescription) {
                         await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
                         document.getElementById('callStatus').innerText = 'Connected';
+                        
+                        // Clear notification
+                        db.ref('user_calls/' + selectedUser).remove();
 
                         // Candidates must only be added AFTER remote description is set
                         db.ref(`calls/${currentCallId}/candidates`).on('child_added', snap => {
@@ -1304,6 +1317,7 @@
             if (currentCallId) {
                 db.ref(`calls/${currentCallId}`).update({ status: 'rejected' });
                 db.ref(`calls/${currentCallId}`).remove();
+                db.ref(`user_calls/${currentUser.uid}`).remove();
             }
             endCallUI();
         }

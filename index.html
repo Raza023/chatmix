@@ -902,28 +902,26 @@
 
             db.ref(newPath).on('value', snap => {
                 const chatBox = document.getElementById('chatBox');
-                if (!chatBox) return; // Guard for render switching
-
-                chatBox.innerHTML = '';
+                if (!chatBox) return;
 
                 let hasUnread = false;
                 const updates = {};
-
-                chatBox.innerHTML = '';
+                const currentKeys = new Set();
+                const wasAtBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 100;
 
                 snap.forEach(child => {
                     const m = child.val();
+                    const key = child.key;
+                    currentKeys.add(key);
                     const isMine = m.sender === currentUser.uid;
+                    const msgId = `msg-${key}`;
 
-                    // Collect updates for unread messages (receiver side)
                     if (!isMine && (!m.status || m.status < 3)) {
-                        updates[child.key + '/status'] = 3;
+                        updates[key + '/status'] = 3;
                         hasUnread = true;
                     }
 
                     const ticks = isMine ? getTicks(m.status || 1) : '';
-
-                    // Process Reacts
                     let reactionsHtml = '';
                     if (m.reactions) {
                         const counts = {};
@@ -938,18 +936,16 @@
                         </div>`;
                     }
 
-                    const div = document.createElement('div');
-                    div.className = `flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in`;
-                    div.innerHTML = `
+                    const innerContent = `
                         <div class="max-w-[85%] md:max-w-md p-4 group relative ${isMine ? 'chat-bubble-mine' : 'chat-bubble-theirs'}">
                             ${isMine ? `
-                            <button onclick="deleteMsg('${child.key}')" class="absolute -top-2 -left-2 p-1.5 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg cursor-pointer transform hover:scale-110 active:scale-90 z-20">
+                            <button onclick="deleteMsg('${key}')" class="absolute -top-2 -left-2 p-1.5 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg cursor-pointer transform hover:scale-110 active:scale-90 z-20">
                                 <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                             </button>` : ''}
                             
                             <div class="absolute -top-8 ${isMine ? 'right-0' : 'left-0'} flex space-x-1 p-1.5 rounded-2xl reaction-picker opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 z-30 pointer-events-none group-hover:pointer-events-auto">
                                 ${['👍', '❤️', '🥶', '😂', '😮', '😢'].map(e => `
-                                    <span onclick="reactToMsg('${child.key}', '${e}')" class="cursor-pointer hover:scale-125 transition-transform px-1">${e}</span>
+                                    <span onclick="reactToMsg('${key}', '${e}')" class="cursor-pointer hover:scale-125 transition-transform px-1">${e}</span>
                                 `).join('')}
                             </div>
 
@@ -967,15 +963,40 @@
                             </div>
                         </div>
                     `;
-                    chatBox.appendChild(div);
+
+                    let messageEl = document.getElementById(msgId);
+                    if (!messageEl) {
+                        messageEl = document.createElement('div');
+                        messageEl.id = msgId;
+                        messageEl.className = `flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in mb-4`;
+                        messageEl.innerHTML = innerContent;
+                        chatBox.appendChild(messageEl);
+                    } else {
+                        // Update existing message only if content changed to avoid blinking
+                        if (messageEl.innerHTML !== innerContent) {
+                            messageEl.innerHTML = innerContent;
+                        }
+                    }
                 });
 
-                // Fire a single consolidated update if needed
+                // Remove deleted messages
+                Array.from(chatBox.children).forEach(child => {
+                    if (child.id && child.id.startsWith('msg-')) {
+                        const key = child.id.replace('msg-', '');
+                        if (!currentKeys.has(key)) {
+                            child.remove();
+                        }
+                    }
+                });
+
+                // Conditional Scroll
+                if (wasAtBottom) {
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }
+
                 if (hasUnread) {
                     db.ref(newPath).update(updates);
                 }
-
-                chatBox.scrollTop = chatBox.scrollHeight;
             });
         }
 

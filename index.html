@@ -652,6 +652,8 @@
         let localStream = null;
         let currentCallId = null;
         let isMuted = false;
+        let callTimeoutTimer = null;
+        let ringtoneAudio = null;
         const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
         function handleTypingStatus() {
@@ -1221,10 +1223,24 @@
                     status: 'offered'
                 });
 
-                // Listen for answer
+                // Auto-stop call after 2 mins
+                clearTimeout(callTimeoutTimer);
+                callTimeoutTimer = setTimeout(() => {
+                    if (currentCallId) {
+                        showToast("No answer. Call ended.", "success");
+                        rejectCall();
+                    }
+                }, 120000);
+
+                // Listen for status changes (Answered, Ringing, Rejected)
                 db.ref(`calls/${currentCallId}`).on('value', async s => {
                     const data = s.val();
-                    if (data && data.status === 'answered' && !pc.currentRemoteDescription) {
+                    if (!data) return;
+
+                    if (data.status === 'ringing') {
+                        document.getElementById('callStatus').innerText = 'Ringing...';
+                    } else if (data.status === 'answered' && !pc.currentRemoteDescription) {
+                        clearTimeout(callTimeoutTimer);
                         await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
                         document.getElementById('callStatus').innerText = 'Connected';
                         
@@ -1238,7 +1254,7 @@
                                 pc.addIceCandidate(new RTCIceCandidate(candid)).catch(e => console.warn("ICE Error:", e));
                             }
                         });
-                    } else if (data && data.status === 'rejected') {
+                    } else if (data.status === 'rejected') {
                         endCallUI();
                     }
                 });
@@ -1260,9 +1276,19 @@
             document.getElementById('callStatus').innerText = 'Incoming Call...';
             document.getElementById('acceptBtn').classList.remove('hidden');
 
-            // Sound
-            const audio = new Audio('https://assets.mixkit.net/sfx/preview/mixkit-modern-classic-door-bell-sound-113.mp3');
-            audio.play();
+            // Notify caller that we are ringing
+            db.ref(`calls/${callId}`).update({ status: 'ringing' });
+
+            // Ringtone
+            ringtoneAudio = new Audio('./ringtone.mp3');
+            ringtoneAudio.loop = true;
+            ringtoneAudio.play().catch(e => console.warn("Audio play blocked by browser. User interaction needed."));
+
+            // Auto-stop incoming call after 2 mins
+            clearTimeout(callTimeoutTimer);
+            callTimeoutTimer = setTimeout(() => {
+                if (currentCallId === callId) rejectCall();
+            }, 120000);
 
             // Auto-reject listener
             db.ref(`calls/${callId}`).on('value', s => {
@@ -1273,6 +1299,13 @@
         async function acceptCall() {
             document.getElementById('callStatus').innerText = 'Connecting...';
             document.getElementById('acceptBtn').classList.add('hidden');
+
+            // Stop ringtone and clear timeout as soon as user accepts
+            if (ringtoneAudio) {
+                ringtoneAudio.pause();
+                ringtoneAudio.currentTime = 0;
+            }
+            clearTimeout(callTimeoutTimer);
 
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1330,6 +1363,12 @@
             document.getElementById('callModal').classList.add('hidden');
             if (localStream) localStream.getTracks().forEach(t => t.stop());
             if (pc) pc.close();
+            if (ringtoneAudio) {
+                ringtoneAudio.pause();
+                ringtoneAudio.currentTime = 0;
+            }
+            clearTimeout(callTimeoutTimer);
+            
             pc = null;
             localStream = null;
             currentCallId = null;

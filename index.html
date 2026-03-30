@@ -637,6 +637,26 @@
             </div>`;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
 
+            // Lightbox Modal
+            const lightboxHtml = `
+            <div id="lightbox" class="fixed inset-0 z-[200] hidden bg-black/90 backdrop-blur-3xl flex items-center justify-center p-4 transition-all duration-300 opacity-0">
+                <div class="absolute top-6 right-6 flex space-x-4 z-10">
+                    <button onclick="zoomOut()" class="p-3 bg-white/10 hover:bg-white/20 rounded-xl text-white transform active:scale-95 transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                    </button>
+                    <button onclick="zoomIn()" class="p-3 bg-white/10 hover:bg-white/20 rounded-xl text-white transform active:scale-95 transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                    </button>
+                    <button onclick="closeLightbox()" class="p-3 bg-red-500 hover:bg-red-600 rounded-xl text-white transform active:scale-95 transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                    </button>
+                </div>
+                <div class="w-full h-full flex items-center justify-center overflow-auto custom-scroll cursor-zoom-out" onclick="closeLightbox()">
+                    <img id="lightboxImg" class="max-h-full max-w-full rounded-lg shadow-2xl transition-transform duration-300 scale-100 cursor-default" onclick="event.stopPropagation()">
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', lightboxHtml);
+
             // Request Browser Notification Permission
             if ("Notification" in window && Notification.permission !== "granted") {
                 Notification.requestPermission();
@@ -661,6 +681,7 @@
         let isMuted = false;
         let callTimeoutTimer = null;
         let ringtoneAudio = null;
+        let lightboxScale = 1;
         const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
         function handleTypingStatus() {
@@ -885,22 +906,47 @@
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
             for (let index in items) {
                 const item = items[index];
-                if (item.kind === 'file') {
-                    const blob = item.getAsFile();
-                    const sizeLimit = 2 * 1024 * 1024; // 2MB
+                if (item.kind === 'file' && item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
                     
-                    if (blob.size > sizeLimit) {
-                        const sizeMB = (blob.size / (1024 * 1024)).toFixed(2);
-                        return showToast(`Image is too large (${sizeMB}MB). Limit is 2.00MB.`);
+                    if (file.size > 2 * 1024 * 1024) {
+                        return showToast(`Image size is ${sizeMB} MB. Maximum allowed is 2.00 MB.`, 'error');
                     }
 
                     const reader = new FileReader();
                     reader.onload = (event) => {
-                        sendImageMsg(event.target.result);
+                        compressImage(event.target.result, (compressed) => {
+                            sendImageMsg(compressed);
+                        });
                     };
-                    reader.readAsDataURL(blob);
+                    reader.readAsDataURL(file);
                 }
             }
+        }
+
+        function compressImage(dataUrl, callback) {
+            const img = new Image();
+            img.src = dataUrl;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // Max resolution to stay thin but high quality
+                const MAX_WIDTH = 1200;
+                if (width > MAX_WIDTH) {
+                    height = (MAX_WIDTH / width) * height;
+                    width = MAX_WIDTH;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                // 0.8 quality handles the "don't falter" requirement perfectly
+                callback(canvas.toDataURL('image/jpeg', 0.8));
+            };
         }
 
         function sendImageMsg(dataUrl) {
@@ -1078,9 +1124,9 @@
                             <div class="p-4 rounded-3xl ${isMine ? 'chat-bubble-mine rounded-br-none' : 'chat-bubble-theirs rounded-bl-none'} shadow-lg border border-white/5">
                                 ${quoteHtml}
                                 ${m.type === 'image' ?
-                                    `<img src="${m.text}" class="w-full max-w-[300px] rounded-xl border border-white/10 shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer" onclick="window.open('${m.text}', '_blank')">` :
+                                    `<img src="${m.text}" class="w-full max-w-[300px] rounded-xl border border-white/10 shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer" onclick="openLightbox(this.src)">` :
                                     (m.text === ':tom_meme:' ?
-                                        `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg house-meme">` :
+                                        `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg house-meme" onclick="openLightbox(this.src)">` :
                                         `<p class="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(m.text)}</p>`
                                     )
                                 }
@@ -1464,6 +1510,37 @@
             } else {
                 div.classList.add('hidden');
             }
+        }
+
+        // Lightbox Functions
+        function openLightbox(src) {
+            const lb = document.getElementById('lightbox');
+            const img = document.getElementById('lightboxImg');
+            img.src = src;
+            lightboxScale = 1;
+            img.style.transform = `scale(${lightboxScale})`;
+            lb.classList.remove('hidden');
+            setTimeout(() => lb.classList.add('opacity-100'), 10);
+        }
+
+        function closeLightbox() {
+            const lb = document.getElementById('lightbox');
+            lb.classList.remove('opacity-100');
+            setTimeout(() => lb.classList.add('hidden'), 300);
+        }
+
+        function zoomIn() {
+            const img = document.getElementById('lightboxImg');
+            lightboxScale += 0.2;
+            if (lightboxScale > 3) lightboxScale = 3;
+            img.style.transform = `scale(${lightboxScale})`;
+        }
+
+        function zoomOut() {
+            const img = document.getElementById('lightboxImg');
+            lightboxScale -= 0.2;
+            if (lightboxScale < 0.5) lightboxScale = 0.5;
+            img.style.transform = `scale(${lightboxScale})`;
         }
 
         function renderEmojiSuggestions() {

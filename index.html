@@ -559,12 +559,17 @@
                         </div>
                     </div>
                     
-                    <div id="chatBox" class="flex-1 p-6 overflow-y-auto space-y-4">
+                    <div id="chatBox" onscroll="handleChatScroll(this)" class="flex-1 p-6 overflow-y-auto space-y-4 relative">
                         <div id="welcomePlaceholder" class="flex items-center justify-center h-full text-gray-500 opacity-50 flex-col space-y-4">
                             <img src="./logo.png" class="w-24 h-24 grayscale opacity-20">
                             <p>Welcome to ChatMix. Your messages are end-to-end encrypted.</p>
                         </div>
                     </div>
+
+                    <button id="scrollToBottomBtn" onclick="scrollToBottomChat()" class="hidden absolute top-24 left-1/2 -translate-x-1/2 z-40 glass-panel px-4 py-2 rounded-full border border-white/20 shadow-2xl text-white/80 hover:text-white flex items-center space-x-2 animate-bounce transition-all transform scale-90 hover:scale-100">
+                        <span class="text-xs font-bold uppercase tracking-wider">Scroll down</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 13l-7 7-7-7m14-8l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path></svg>
+                    </button>
 
                     <div id="typingIndicator" class="px-6 py-1 h-6 text-xs text-secondary font-medium animate-pulse hidden">
                         <span id="typingText"></span>
@@ -1091,6 +1096,29 @@
                 setTimeout(() => el.classList.remove('ring-2', 'ring-secondary'), 2000);
             } else {
                 showToast('Original message not found in history.');
+            }
+        }
+
+        function handleChatScroll(el) {
+            const btn = document.getElementById('scrollToBottomBtn');
+            if (!btn) return;
+            const threshold = 300; 
+            const isScrolledUp = el.scrollHeight - el.scrollTop - el.clientHeight > threshold;
+            
+            if (isScrolledUp) {
+                btn.classList.remove('hidden');
+            } else {
+                btn.classList.add('hidden');
+            }
+        }
+
+        function scrollToBottomChat() {
+            const chatBox = document.getElementById('chatBox');
+            if (chatBox) {
+                chatBox.scrollTo({
+                    top: chatBox.scrollHeight,
+                    behavior: 'smooth'
+                });
             }
         }
 

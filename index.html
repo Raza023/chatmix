@@ -1780,7 +1780,7 @@
             <div id="groupModal" class="fixed inset-0 z-[150] bg-black/60 backdrop-blur-xl flex items-center justify-center p-4">
                 <div class="glass-panel w-full max-w-md rounded-3xl p-8 border border-white/20 animate-fade-in">
                     <h2 class="text-2xl font-bold mb-4">Create New Group</h2>
-                    <input id="groupName" class="glass-input p-4 w-full rounded-xl mb-4" placeholder="Group Name">
+                    <input id="groupName" class="glass-input p-4 w-full rounded-xl mb-4" placeholder="Group Name" maxlength="30">
                     <div class="relative mb-4">
                         <input id="groupUserSearch" oninput="handleGroupUserSearch(this.value)" class="glass-input p-3 w-full rounded-xl text-sm" placeholder="Search members by email...">
                     </div>
@@ -1824,8 +1824,18 @@
         }
 
         function createGroup() {
-            const name = document.getElementById('groupName').value;
+            const name = document.getElementById('groupName').value.trim();
             if (!name) return showToast('Please enter a group name.');
+            
+            if (name.length > 30) {
+                return showToast('Group name cannot exceed 30 characters.');
+            }
+
+            const abnormalChars = /[<>]/;
+            if (abnormalChars.test(name)) {
+                return showToast('Invalid group name! Scripting characters are not allowed.');
+            }
+
             if (groupSelectedMembers.size === 0) return showToast('Please select at least one member.');
 
             const groupId = 'group_' + Date.now();

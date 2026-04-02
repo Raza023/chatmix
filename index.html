@@ -762,11 +762,22 @@
             // WATCH GROUPS
             db.ref('user_groups/' + currentUser.uid).on('value', snap => {
                 const groupIds = snap.val() || {};
+                
+                // Clear existing group listeners to prevent duplicates
+                myGroups.forEach(g => {
+                    if (g.gid) db.ref('groups/' + g.gid).off('value');
+                });
                 myGroups = [];
+
                 Object.keys(groupIds).forEach(gid => {
-                    db.ref('groups/' + gid).once('value', gSnap => {
+                    db.ref('groups/' + gid).on('value', gSnap => {
                         if (gSnap.exists()) {
-                            myGroups.push({ gid, ...gSnap.val(), isGroup: true });
+                            const gData = { gid, ...gSnap.val(), isGroup: true };
+                            // Efficiently update or add to myGroups
+                            const idx = myGroups.findIndex(g => g.gid === gid);
+                            if (idx > -1) myGroups[idx] = gData;
+                            else myGroups.push(gData);
+
                             setupGroupListener(gid, gSnap.val().name);
                             renderUserList();
                         }

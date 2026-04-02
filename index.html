@@ -957,8 +957,18 @@
             // Hide calling for groups for now
             if (isGroup) {
                 actions.querySelector('button[title="Audio Call"]').classList.add('hidden');
-                document.getElementById('deleteChatBtn').classList.add('hidden');
-                document.getElementById('leaveGroupBtn').classList.remove('hidden');
+                
+                // Find group to check member count
+                const group = myGroups.find(g => g.gid === uid);
+                const memberCount = group ? Object.keys(group.members || {}).length : 0;
+
+                if (memberCount <= 1) {
+                    document.getElementById('deleteChatBtn').classList.remove('hidden');
+                    document.getElementById('leaveGroupBtn').classList.add('hidden');
+                } else {
+                    document.getElementById('deleteChatBtn').classList.add('hidden');
+                    document.getElementById('leaveGroupBtn').classList.remove('hidden');
+                }
                 document.getElementById('addUserToGroupBtn').classList.remove('hidden');
             } else {
                 actions.querySelector('button[title="Audio Call"]').classList.remove('hidden');
@@ -998,14 +1008,26 @@
 
         function deleteChat() {
             if (!selectedUser) return;
-            const res = confirm(`Are you sure you want to delete this chat with ${document.getElementById('selectedUserName').innerText}? This will permanently remove all messages for BOTH users.`);
+            const chatName = document.getElementById('selectedUserName').innerText;
+            const res = confirm(`Are you sure you want to delete "${chatName}"? This will permanently remove all messages for everyone.`);
             if (!res) return;
 
             const id = chatId(currentUser.uid, selectedUser);
             const updates = {};
-            updates[`messages/${id}`] = null;
-            updates[`user_chats/${currentUser.uid}/${selectedUser}`] = null;
-            updates[`user_chats/${selectedUser}/${currentUser.uid}`] = null;
+            
+            if (isGroup) {
+                // Deep clean for Groups
+                updates[`messages/${selectedUser}`] = null;
+                updates[`groups/${selectedUser}`] = null;
+                updates[`user_groups/${currentUser.uid}/${selectedUser}`] = null;
+                // Also clean up typing and calls if they exist
+                updates[`typing_to/${selectedUser}`] = null;
+            } else {
+                // Existing Individual Chat logic
+                updates[`messages/${id}`] = null;
+                updates[`user_chats/${currentUser.uid}/${selectedUser}`] = null;
+                updates[`user_chats/${selectedUser}/${currentUser.uid}`] = null;
+            }
 
             db.ref().update(updates).then(() => {
                 showToast('Chat deleted permanently.', 'success');

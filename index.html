@@ -790,6 +790,12 @@
             let initialLoad = true;
             listeners[gid] = db.ref('messages/' + gid).on('child_added', msgSnap => {
                 const msg = msgSnap.val();
+                
+                // Group Receipts: Mark as Delivered (2)
+                if (msg.sender !== currentUser.uid && (!msg.receipts || msg.receipts[currentUser.uid] < 2)) {
+                    db.ref('messages/' + gid + '/' + msgSnap.key + '/receipts/' + currentUser.uid).set(2);
+                }
+
                 if (initialLoad) return;
                 if (msg.sender !== currentUser.uid && gid !== selectedUser) {
                     unreadCounts[gid] = (unreadCounts[gid] || 0) + 1;
@@ -810,6 +816,11 @@
                 // If I receive a message and it's not marked as delivered (2) or seen (3)
                 if (msg.sender !== currentUser.uid && (!msg.status || msg.status < 2)) {
                     db.ref('messages/' + id + '/' + msgSnap.key).update({ status: 2 });
+                }
+                
+                // Group Receipts for background messages (rare but for safety)
+                if (isGroup && msg.sender !== currentUser.uid && (!msg.receipts || msg.receipts[currentUser.uid] < 2)) {
+                    db.ref('messages/' + id + '/' + msgSnap.key + '/receipts/' + currentUser.uid).set(2);
                 }
 
                 if (initialLoad) return;
@@ -1152,6 +1163,13 @@
                 const msgMap = {};
                 snap.forEach(child => { msgMap[child.key] = child.val(); });
 
+                // Find member count for ticks if it's a group
+                let groupMemberCount = 0;
+                if (isGroup) {
+                    const group = myGroups.find(g => g.gid === selectedUser);
+                    if (group) groupMemberCount = Object.keys(group.members).length;
+                }
+
                 snap.forEach(child => {
                     const m = child.val();
                     const key = child.key;
@@ -1159,12 +1177,19 @@
                     const isMine = m.sender === currentUser.uid;
                     const msgId = `msg-${key}`;
 
-                    if (!isMine && (!m.status || m.status < 3)) {
-                        updates[key + '/status'] = 3;
-                        hasUnread = true;
+                    if (!isMine) {
+                        if (isGroup) {
+                            // Group Receipts: Mark as Read (3)
+                            if (!m.receipts || m.receipts[currentUser.uid] < 3) {
+                                db.ref('messages/' + id + '/' + key + '/receipts/' + currentUser.uid).set(3);
+                            }
+                        } else if (!m.status || m.status < 3) {
+                            updates[key + '/status'] = 3;
+                            hasUnread = true;
+                        }
                     }
 
-                    const ticks = isMine ? getTicks(m.status || 1) : '';
+                    const ticks = isMine ? getTicks(m, isGroup, groupMemberCount) : '';
                     let reactionsHtml = '';
                     if (m.reactions) {
                         const counts = {};
@@ -1553,8 +1578,24 @@
             }
         }
 
-        function getTicks(status) {
+        function getTicks(msg, forGroup = false, groupTotalCount = 0) {
             const size = "w-4 h-4";
+            let status = msg.status || 1;
+
+            if (forGroup && groupTotalCount > 1) {
+                const receipts = msg.receipts || {};
+                // Everyone except the sender must have a receipt
+                const requiredReceipts = groupTotalCount - 1;
+                const receiptEntries = Object.entries(receipts).filter(([uid]) => uid !== msg.sender);
+                
+                const deliveredCount = receiptEntries.filter(([_, s]) => s >= 2).length;
+                const readCount = receiptEntries.filter(([_, s]) => s === 3).length;
+
+                if (readCount >= requiredReceipts) status = 3;
+                else if (deliveredCount >= requiredReceipts) status = 2;
+                else status = 1;
+            }
+
             if (status === 3) {
                 // Double Blue Tick (Seen) - Extra bold and neon
                 return `<svg class="${size}" style="filter: drop-shadow(0 0 2px rgba(0, 242, 254, 0.4));" viewBox="0 0 24 24" fill="none" stroke="#00f2fe" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12l5 5L12 12"/><path d="M7 12l5 5L22 7"/></svg>`;

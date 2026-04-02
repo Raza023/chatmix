@@ -1902,7 +1902,7 @@
             
             // Map IDs to available user data + myself
             const members = memberIds.map(uid => {
-                if (uid === currentUser.uid) return { name: 'You (Admin)', email: currentUser.email, online: true };
+                if (uid === currentUser.uid) return { name: 'You', email: currentUser.email, online: true };
                 const u = usersData.find(ud => ud.uid === uid);
                 if (u) {
                     const isOnline = u.lastSeen && (now - u.lastSeen < 60000);
@@ -1937,7 +1937,7 @@
                                 </div>
                                 <div class="flex flex-col items-end">
                                     <div class="w-2 h-2 rounded-full ${m.online ? 'status-dot-online' : 'status-dot-offline'}"></div>
-                                    <span class="text-[9px] ${m.online ? 'text-green-400' : 'text-gray-500'} font-bold uppercase mt-1">${m.online ? 'Live' : 'Off'}</span>
+                                    <span class="text-[9px] ${m.online ? 'text-green-400' : 'text-gray-500'} font-bold uppercase mt-1">${m.online ? 'Online' : 'Offline'}</span>
                                 </div>
                             </div>
                         `).join('')}

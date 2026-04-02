@@ -253,6 +253,14 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
 
     <script>
+        // Security: Escape HTML to prevent XSS
+        function escapeHTML(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
         (function () {
             emailjs.init("La4jKdbxwJ4KsEEhr");
 
@@ -286,12 +294,6 @@
             return null;
         }
 
-        function escapeHTML(str) {
-            const p = document.createElement('p');
-            p.textContent = str;
-            return p.innerHTML;
-        }
-
         function eraseCookie(name) {
             document.cookie = name + '=; Max-Age=-99999999; path=/; SameSite=Lax';
         }
@@ -320,7 +322,7 @@
                 ${icon}
                 <div class="flex-1">
                     <p class="text-sm font-semibold">${type === 'error' ? 'Oops!' : 'Success'}</p>
-                    <p class="text-xs text-white/70">${message}</p>
+                    <p class="text-xs text-white/70">${escapeHTML(message)}</p>
                 </div>
             `;
 
@@ -937,7 +939,7 @@
             }
 
             if (typers.length === 1) {
-                typingText.innerHTML = `${typers[0]} is typing<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>`;
+                typingText.innerHTML = `${escapeHTML(typers[0])} is typing<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>`;
                 indicator.classList.remove('hidden');
             } else if (typers.length > 1) {
                 typingText.innerHTML = `Someone is typing<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>`;
@@ -1235,7 +1237,7 @@
                         reactionsHtml = `<div class="flex flex-wrap gap-1 mt-2">
                             ${Object.entries(counts).map(([emoji, count]) => `
                                 <div class="bg-white/10 px-2 py-0.5 rounded-full text-xs flex items-center space-x-1 border border-white/10">
-                                    <span>${emoji}</span>
+                                    <span>${escapeHTML(emoji)}</span>
                                     ${count > 1 ? `<span class="opacity-60">${count}</span>` : ''}
                                 </div>
                             `).join('')}
@@ -1272,7 +1274,7 @@
                             </button>` : ''}
                             
                             <div class="absolute -top-8 ${isMine ? 'right-0' : 'left-0'} flex space-x-1 p-1.5 rounded-2xl reaction-picker opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 z-30 pointer-events-none group-hover:pointer-events-auto shadow-xl ring-1 ring-white/10">
-                                <button onclick="setReply('${key}', '${m.type === 'image' ? 'Image' : escapeHTML(m.text).replace(/'/g, "\\'").replace(/\n/g, ' ')}', '${senderName}')" class="p-1 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors">
+                                <button onclick="setReply('${key}', '${m.type === 'image' ? 'Image' : escapeHTML(m.text).replace(/'/g, "\\'").replace(/\n/g, ' ')}', '${escapeHTML(actualSenderName).replace(/'/g, "\\'")}')" class="p-1 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                                 </button>
                                 <div class="w-px h-4 bg-white/10 mx-1"></div>
@@ -1494,7 +1496,7 @@
             document.getElementById('callAvatar').innerText = name.split(' ').map(n => n[0]).join('');
             document.getElementById('callName').innerText = name;
             document.getElementById('callStatus').innerText = 'Incoming Call...';
-            document.getElementById('acceptBtn').classList.remove('hidden');
+            document.getElementById('acceptBtn').classList.add('hidden');
 
             // Notify caller that we are ringing
             db.ref(`calls/${callId}`).update({ status: 'ringing' });
@@ -1723,7 +1725,7 @@
             const div = document.getElementById('emojiSuggestions');
             div.innerHTML = activeMatches.map(([k, v], i) => `
                 <div onclick="applyEmoji('${k}')" class="p-2 ${i === emojiIdx ? 'bg-white/20' : 'hover:bg-white/10'} rounded-lg cursor-pointer flex justify-between items-center text-sm transition-colors">
-                    <span class="${i === emojiIdx ? 'text-white' : 'text-white/60'}">${k}</span>
+                    <span class="${i === emojiIdx ? 'text-white' : 'text-white/60'}">${escapeHTML(k)}</span>
                     <span>${v === ':tom_meme:' ? '🐱' : v}</span>
                 </div>
             `).join('');

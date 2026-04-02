@@ -1250,7 +1250,7 @@
                             </button>` : ''}
                             
                             <div class="absolute -top-8 ${isMine ? 'right-0' : 'left-0'} flex space-x-1 p-1.5 rounded-2xl reaction-picker opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 z-30 pointer-events-none group-hover:pointer-events-auto shadow-xl ring-1 ring-white/10">
-                                <button onclick="setReply('${key}', '${m.type === 'image' ? 'Image' : escapeHTML(m.text).replace(/'/g, "\\'")}', '${senderName}')" class="p-1 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors">
+                                <button onclick="setReply('${key}', '${m.type === 'image' ? 'Image' : escapeHTML(m.text).replace(/'/g, "\\'").replace(/\n/g, ' ')}', '${senderName}')" class="p-1 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                                 </button>
                                 <div class="w-px h-4 bg-white/10 mx-1"></div>

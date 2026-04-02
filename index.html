@@ -1020,8 +1020,8 @@
                 updates[`messages/${selectedUser}`] = null;
                 updates[`groups/${selectedUser}`] = null;
                 updates[`user_groups/${currentUser.uid}/${selectedUser}`] = null;
-                // Also clean up typing and calls if they exist
-                updates[`typing_to/${selectedUser}`] = null;
+                // Only clear MY typing status, not the whole group's node
+                updates[`typing_to/${selectedUser}/${currentUser.uid}`] = null;
             } else {
                 // Existing Individual Chat logic
                 updates[`messages/${id}`] = null;

@@ -1210,10 +1210,33 @@
                     if (group) groupMemberCount = Object.keys(group.members).length;
                 }
 
+                let lastDateLabel = "";
                 snap.forEach(child => {
                     const m = child.val();
                     const key = child.key;
                     currentKeys.add(key);
+
+                    // Date Divider Logic
+                    const dateLabel = formatDividerDate(m.time);
+                    const dateId = `date-${dateLabel.replace(/\s/g, '-')}`;
+                    currentKeys.add(dateId);
+
+                    if (dateLabel !== lastDateLabel) {
+                        let dateDiv = document.getElementById(dateId);
+                        if (!dateDiv) {
+                            dateDiv = document.createElement('div');
+                            dateDiv.id = dateId;
+                            dateDiv.className = "flex justify-center my-6 animate-fade-in";
+                            dateDiv.innerHTML = `
+                                <div class="glass-panel px-4 py-1.5 rounded-full border border-white/10 shadow-xl">
+                                    <span class="text-[10px] font-bold uppercase tracking-widest text-white/50">${dateLabel}</span>
+                                </div>
+                            `;
+                            chatBox.appendChild(dateDiv);
+                        }
+                        lastDateLabel = dateLabel;
+                    }
+
                     const isMine = m.sender === currentUser.uid;
                     const msgId = `msg-${key}`;
 
@@ -1316,10 +1339,13 @@
                     }
                 });
 
-                // Remove deleted messages
+                // Remove deleted messages or unused date dividers
                 Array.from(chatBox.children).forEach(child => {
-                    if (child.id && child.id.startsWith('msg-')) {
-                        const key = child.id.replace('msg-', '');
+                    if (child.id && (child.id.startsWith('msg-') || child.id.startsWith('date-'))) {
+                        let key = child.id;
+                        if (key.startsWith('msg-')) key = key.replace('msg-', '');
+                        
+                        // For date dividers, we keep the full ID in currentKeys
                         if (!currentKeys.has(key)) {
                             child.remove();
                         }
@@ -1496,7 +1522,7 @@
             document.getElementById('callAvatar').innerText = name.split(' ').map(n => n[0]).join('');
             document.getElementById('callName').innerText = name;
             document.getElementById('callStatus').innerText = 'Incoming Call...';
-            document.getElementById('acceptBtn').classList.add('hidden');
+            document.getElementById('acceptBtn').classList.remove('hidden');
 
             // Notify caller that we are ringing
             db.ref(`calls/${callId}`).update({ status: 'ringing' });
@@ -1624,6 +1650,22 @@
                 btn.innerHTML = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>`;
                 showToast("Microphone active", "success");
             }
+        }
+
+        function formatDividerDate(time) {
+            const date = new Date(time);
+            const today = new Date();
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+
+            if (date.toDateString() === today.toDateString()) return "Today";
+            if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+            
+            return date.toLocaleDateString(undefined, { 
+                day: 'numeric', 
+                month: 'short', 
+                year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined 
+            });
         }
 
         function getTicks(msg, forGroup = false, groupTotalCount = 0) {

@@ -257,7 +257,7 @@
             emailjs.init("La4jKdbxwJ4KsEEhr");
 
             // Disable Console Logging for Security
-            const noop = () => {};
+            const noop = () => { };
             window.console.log = noop;
             window.console.warn = noop;
             window.console.error = noop;
@@ -521,6 +521,9 @@
                                 <span class="font-bold text-xl tracking-tight">ChatMix</span>
                             </div>
                             <div class="flex items-center space-x-2">
+                                <button onclick="renderGroupModal()" class="p-2 hover:bg-white/10 rounded-full transition-colors text-white/70 hover:text-white" title="Create Group">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                                </button>
                                 <button onclick="toggleSearch()" class="p-2 hover:bg-white/10 rounded-full transition-colors text-white/70 hover:text-white">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                                 </button>
@@ -564,8 +567,11 @@
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                             </button>
                             <div class="w-px h-6 bg-white/10 mx-1"></div>
-                            <button onclick="deleteChat()" class="p-2 hover:bg-red-500/20 rounded-full transition text-red-400 group" title="Delete conversation">
+                            <button id="deleteChatBtn" onclick="deleteChat()" class="p-2 hover:bg-red-500/20 rounded-full transition text-red-400 group" title="Delete conversation">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                            </button>
+                            <button id="leaveGroupBtn" onclick="leaveGroup()" class="p-2 hover:bg-orange-500/20 rounded-full transition text-orange-400 hidden" title="Leave Group">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                             </button>
                         </div>
                     </div>
@@ -664,9 +670,12 @@
         }
 
         let selectedUser = null;
+        let isGroup = false;
+        let groupSelectedMembers = new Set();
         let unreadCounts = {};
         let listeners = {};
         let usersData = [];
+        let myGroups = [];
         let myData = null;
         let activeChatUids = new Set();
         let searchQuery = '';
@@ -684,16 +693,19 @@
         let lightboxScale = 1;
         const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
+        // Typing logic
+        let typingIndicatorListener = null;
+
         function handleTypingStatus() {
             if (!selectedUser) return;
-            // Write specifically to the recipient's typing-inbox
+            // Write specifically to the target's node (User ID or Group ID)
             const ref = db.ref(`typing_to/${selectedUser}/${currentUser.uid}`);
             ref.set(true);
 
             clearTimeout(typingTimer);
             typingTimer = setTimeout(() => {
                 ref.set(false);
-            }, 3000);
+            }, 500);
         }
 
         function toggleSearch() {
@@ -732,7 +744,7 @@
             db.ref('typing_to/' + currentUser.uid).on('value', snap => {
                 const data = snap.val() || {};
                 const prev = JSON.stringify(typingUsers);
-                
+
                 typingUsers = {};
                 Object.entries(data).forEach(([senderUid, isTyping]) => {
                     if (isTyping) typingUsers[senderUid] = true;
@@ -742,6 +754,21 @@
                     renderUserList();
                     updateChatTypingStatus();
                 }
+            });
+
+            // WATCH GROUPS
+            db.ref('user_groups/' + currentUser.uid).on('value', snap => {
+                const groupIds = snap.val() || {};
+                myGroups = [];
+                Object.keys(groupIds).forEach(gid => {
+                    db.ref('groups/' + gid).once('value', gSnap => {
+                        if (gSnap.exists()) {
+                            myGroups.push({ gid, ...gSnap.val(), isGroup: true });
+                            setupGroupListener(gid, gSnap.val().name);
+                            renderUserList();
+                        }
+                    });
+                });
             });
 
             db.ref('users').on('value', snap => {
@@ -756,6 +783,21 @@
                 });
                 renderUserList();
             });
+        }
+
+        function setupGroupListener(gid, name) {
+            if (listeners[gid]) return;
+            let initialLoad = true;
+            listeners[gid] = db.ref('messages/' + gid).on('child_added', msgSnap => {
+                const msg = msgSnap.val();
+                if (initialLoad) return;
+                if (msg.sender !== currentUser.uid && gid !== selectedUser) {
+                    unreadCounts[gid] = (unreadCounts[gid] || 0) + 1;
+                    showToast(`New message in ${name}`, 'success');
+                    renderUserList();
+                }
+            });
+            setTimeout(() => { initialLoad = false; }, 1200);
         }
 
         function setupMessageListener(uid, name) {
@@ -810,19 +852,22 @@
                 return;
             }
 
-            filteredUsers.forEach(u => {
-                const isOnline = u.lastSeen && (now - u.lastSeen < 60000);
-                const isTyping = typingUsers[u.uid];
-                const count = unreadCounts[u.uid] || 0;
+            const allConversations = [...myGroups, ...filteredUsers];
+
+            allConversations.forEach(u => {
+                const isOnline = u.isGroup || (u.lastSeen && (now - u.lastSeen < 60000));
+                const isTyping = typingUsers[u.uid || u.gid];
+                const count = unreadCounts[u.uid || u.gid] || 0;
+                const convId = u.uid || u.gid;
                 const div = document.createElement('div');
-                div.className = `p-4 user-item cursor-pointer flex items-center space-x-4 ${selectedUser === u.uid ? 'active' : ''}`;
+                div.className = `p-4 user-item cursor-pointer flex items-center space-x-4 ${selectedUser === convId ? 'active' : ''}`;
                 div.innerHTML = `
                     <div class="relative">
-                        <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold border border-white/10 text-white">
-                            ${escapeHTML(u.name)[0].toUpperCase()}
+                        <div class="w-10 h-10 rounded-full ${u.isGroup ? 'bg-secondary/20 text-secondary border-secondary/30' : 'bg-white/10 text-white border-white/10'} flex items-center justify-center font-bold border">
+                            ${(u.name || 'G')[0].toUpperCase()}
                         </div>
                         ${count > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#1a1a1a] animate-bounce">${count}</div>` : ''}
-                        <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#1a1a1a] ${isOnline ? 'status-dot-online' : 'status-dot-offline'}"></div>
+                        ${!u.isGroup ? `<div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#1a1a1a] ${isOnline ? 'status-dot-online' : 'status-dot-offline'}"></div>` : ''}
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="font-semibold text-white truncate">${escapeHTML(u.name)}</p>
@@ -830,38 +875,70 @@
                             <p class="text-xs text-secondary italic font-medium typing-dots">Typing<span>.</span><span>.</span><span>.</span></p>
                         ` : `
                             <p class="text-xs ${isOnline ? 'text-green-400' : 'text-gray-500'} truncate">
-                                ${isOnline ? 'Online' : 'Offline'}
+                                ${u.isGroup ? (Object.keys(u.members || {}).length + ' members') : (isOnline ? 'Online' : 'Offline')}
                             </p>
                         `}
                     </div>
                 `;
                 div.onclick = () => {
-                    unreadCounts[u.uid] = 0;
-                    selectUser(u.uid, u.name);
+                    unreadCounts[convId] = 0;
+                    selectUser(convId, u.name, u.isGroup);
                     renderUserList();
                 };
                 usersDiv.appendChild(div);
             });
         }
 
-        function updateChatTypingStatus() {
+        function updateChatTypingStatus(groupTypingData = {}) {
             const indicator = document.getElementById('typingIndicator');
             const typingText = document.getElementById('typingText');
             if (!indicator || !selectedUser) return;
 
-            if (typingUsers[selectedUser]) {
-                const name = document.getElementById('selectedUserName').innerText;
-                typingText.innerHTML = `${name} is typing<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>`;
+            let typers = [];
+
+            if (isGroup) {
+                // Collect everyone typing in the group except ME
+                Object.entries(groupTypingData).forEach(([uid, isTyping]) => {
+                    if (isTyping && uid !== currentUser.uid) {
+                        const user = usersData.find(u => u.uid === uid);
+                        typers.push(user ? user.name : 'Participant');
+                    }
+                });
+            } else {
+                if (typingUsers[selectedUser]) {
+                    const name = document.getElementById('selectedUserName').innerText;
+                    typers.push(name);
+                }
+            }
+
+            if (typers.length === 1) {
+                typingText.innerHTML = `${typers[0]} is typing<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>`;
+                indicator.classList.remove('hidden');
+            } else if (typers.length > 1) {
+                typingText.innerHTML = `Someone is typing<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>`;
                 indicator.classList.remove('hidden');
             } else {
                 indicator.classList.add('hidden');
             }
         }
 
-        function selectUser(uid, name) {
+        function selectUser(uid, name, group = false) {
             selectedUser = uid;
+            isGroup = group;
             document.getElementById('selectedUserName').innerText = name;
-            document.getElementById('chatActions').classList.remove('hidden');
+
+            const actions = document.getElementById('chatActions');
+            actions.classList.remove('hidden');
+            // Hide calling for groups for now
+            if (isGroup) {
+                actions.querySelector('button[title="Audio Call"]').classList.add('hidden');
+                document.getElementById('deleteChatBtn').classList.add('hidden');
+                document.getElementById('leaveGroupBtn').classList.remove('hidden');
+            } else {
+                actions.querySelector('button[title="Audio Call"]').classList.remove('hidden');
+                document.getElementById('deleteChatBtn').classList.remove('hidden');
+                document.getElementById('leaveGroupBtn').classList.add('hidden');
+            }
 
             // Mobile Transition
             if (window.innerWidth < 768) {
@@ -869,6 +946,17 @@
                 document.getElementById('chatSection').classList.remove('hidden');
                 document.getElementById('chatSection').classList.add('flex');
             }
+
+            // Reset Typing Watcher for the current conversation
+            if (typingIndicatorListener) {
+                typingIndicatorListener.off();
+            }
+
+            // Listen for everyone typing in this specific conversation
+            typingIndicatorListener = db.ref('typing_to/' + uid);
+            typingIndicatorListener.on('value', snap => {
+                updateChatTypingStatus(snap.val() || {});
+            });
 
             loadMessages();
         }
@@ -899,6 +987,7 @@
         }
 
         function chatId(a, b) {
+            if (isGroup) return selectedUser;
             return a < b ? a + '_' + b : b + '_' + a;
         }
 
@@ -909,7 +998,7 @@
                 if (item.kind === 'file' && item.type.startsWith('image/')) {
                     const file = item.getAsFile();
                     const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-                    
+
                     if (file.size > 2 * 1024 * 1024) {
                         return showToast(`Image size is ${sizeMB} MB. Maximum allowed is 2.00 MB.`, 'error');
                     }
@@ -959,7 +1048,7 @@
                 time: Date.now(),
                 status: 1
             });
-            
+
             // Index for sidebar visibility under secure rules
             db.ref('user_chats/' + currentUser.uid + '/' + selectedUser).set(true);
             db.ref('user_chats/' + selectedUser + '/' + currentUser.uid).set(true);
@@ -1058,7 +1147,7 @@
                 const updates = {};
                 const currentKeys = new Set();
                 const wasAtBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 100;
-                
+
                 // Build message map for fast reply lookup
                 const msgMap = {};
                 snap.forEach(child => { msgMap[child.key] = child.val(); });
@@ -1124,12 +1213,12 @@
                             <div class="p-4 rounded-3xl ${isMine ? 'chat-bubble-mine rounded-br-none' : 'chat-bubble-theirs rounded-bl-none'} shadow-lg border border-white/5">
                                 ${quoteHtml}
                                 ${m.type === 'image' ?
-                                    `<img src="${m.text}" class="w-full max-w-[300px] rounded-xl border border-white/10 shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer" onclick="openLightbox(this.src)">` :
-                                    (m.text === ':tom_meme:' ?
-                                        `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg house-meme" onclick="openLightbox(this.src)">` :
-                                        `<p class="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(m.text)}</p>`
-                                    )
-                                }
+                            `<img src="${m.text}" class="w-full max-w-[300px] rounded-xl border border-white/10 shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer" onclick="openLightbox(this.src)">` :
+                            (m.text === ':tom_meme:' ?
+                                `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg house-meme" onclick="openLightbox(this.src)">` :
+                                `<p class="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(m.text)}</p>`
+                            )
+                        }
                                 ${reactionsHtml}
                                 <div class="flex items-center justify-end space-x-1 mt-1 opacity-60">
                                     <p class="text-[10px]">${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
@@ -1202,9 +1291,9 @@
         function handleChatScroll(el) {
             const btn = document.getElementById('scrollToBottomBtn');
             if (!btn) return;
-            const threshold = 300; 
+            const threshold = 300;
             const isScrolledUp = el.scrollHeight - el.scrollTop - el.clientHeight > threshold;
-            
+
             if (isScrolledUp) {
                 btn.classList.remove('hidden');
             } else {
@@ -1237,10 +1326,10 @@
         async function startAudioCall() {
             if (!selectedUser) return;
             const name = document.getElementById('selectedUserName').innerText;
-            
+
             // UI
             document.getElementById('callModal').classList.remove('hidden');
-            document.getElementById('callAvatar').innerText = name.split(' ').map(n=>n[0]).join('');
+            document.getElementById('callAvatar').innerText = name.split(' ').map(n => n[0]).join('');
             document.getElementById('callName').innerText = name;
             document.getElementById('callStatus').innerText = 'Calling...';
             document.getElementById('acceptBtn').classList.add('hidden');
@@ -1265,7 +1354,7 @@
 
                 const callRef = db.ref('calls').push();
                 currentCallId = callRef.key;
-                
+
                 const callData = {
                     from: currentUser.uid,
                     to: selectedUser,
@@ -1303,7 +1392,7 @@
                         clearTimeout(callTimeoutTimer);
                         await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
                         document.getElementById('callStatus').innerText = 'Connected';
-                        
+
                         // Clear notification
                         db.ref('user_calls/' + selectedUser).remove();
 
@@ -1331,7 +1420,7 @@
             const name = data ? data.name : 'Unknown';
 
             document.getElementById('callModal').classList.remove('hidden');
-            document.getElementById('callAvatar').innerText = name.split(' ').map(n=>n[0]).join('');
+            document.getElementById('callAvatar').innerText = name.split(' ').map(n => n[0]).join('');
             document.getElementById('callName').innerText = name;
             document.getElementById('callStatus').innerText = 'Incoming Call...';
             document.getElementById('acceptBtn').classList.remove('hidden');
@@ -1428,12 +1517,12 @@
                 ringtoneAudio.currentTime = 0;
             }
             clearTimeout(callTimeoutTimer);
-            
+
             pc = null;
             localStream = null;
             currentCallId = null;
             isMuted = false;
-            
+
             // Reset mute button UI
             const btn = document.getElementById('muteBtn');
             if (btn) {
@@ -1593,6 +1682,95 @@
 
             document.getElementById('emojiSuggestions').classList.add('hidden');
             input.focus();
+        }
+
+        // Group Logic
+        function renderGroupModal() {
+            groupSelectedMembers = new Set();
+            const modal = `
+            <div id="groupModal" class="fixed inset-0 z-[150] bg-black/60 backdrop-blur-xl flex items-center justify-center p-4">
+                <div class="glass-panel w-full max-w-md rounded-3xl p-8 border border-white/20 animate-fade-in">
+                    <h2 class="text-2xl font-bold mb-4">Create New Group</h2>
+                    <input id="groupName" class="glass-input p-4 w-full rounded-xl mb-4" placeholder="Group Name">
+                    <div class="relative mb-4">
+                        <input id="groupUserSearch" oninput="handleGroupUserSearch(this.value)" class="glass-input p-3 w-full rounded-xl text-sm" placeholder="Search members by email...">
+                    </div>
+                    <div id="groupUserList" class="max-h-60 overflow-y-auto space-y-2 mb-6 custom-scroll">
+                        <p class="text-center text-gray-500 text-sm py-4">Search users to add them.</p>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button onclick="closeGroupModal()" class="flex-1 p-4 bg-white/10 hover:bg-white/20 rounded-xl transition-colors font-bold">Cancel</button>
+                        <button onclick="createGroup()" class="flex-1 p-4 gradient-btn rounded-xl text-white font-bold">Create Group</button>
+                    </div>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modal);
+        }
+
+        function handleGroupUserSearch(val) {
+            const list = document.getElementById('groupUserList');
+            if (!val) {
+                list.innerHTML = '<p class="text-center text-gray-500 text-sm py-4">Search users to add them.</p>';
+                return;
+            }
+            const query = val.toLowerCase();
+            const filtered = usersData.filter(u => u.email.toLowerCase().includes(query));
+
+            list.innerHTML = filtered.map(u => `
+                <div class="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center font-bold text-xs">
+                            ${u.name[0].toUpperCase()}
+                        </div>
+                        <p class="text-sm font-medium truncate">${escapeHTML(u.name)}</p>
+                    </div>
+                    <input type="checkbox" onchange="toggleGroupMember('${u.uid}')" ${groupSelectedMembers.has(u.uid) ? 'checked' : ''} class="w-5 h-5 rounded border-white/20 bg-transparent text-secondary focus:ring-secondary">
+                </div>
+            `).join('') || '<p class="text-center text-gray-500 text-sm py-4">No users found.</p>';
+        }
+
+        function toggleGroupMember(uid) {
+            if (groupSelectedMembers.has(uid)) groupSelectedMembers.delete(uid);
+            else groupSelectedMembers.add(uid);
+        }
+
+        function createGroup() {
+            const name = document.getElementById('groupName').value;
+            if (!name) return showToast('Please enter a group name.');
+            if (groupSelectedMembers.size === 0) return showToast('Please select at least one member.');
+
+            const groupId = 'group_' + Date.now();
+            const members = { [currentUser.uid]: true };
+            groupSelectedMembers.forEach(uid => members[uid] = true);
+
+            const updates = {};
+            updates[`groups/${groupId}`] = { name, members, createdBy: currentUser.uid, createdAt: Date.now() };
+            Object.keys(members).forEach(uid => {
+                updates[`user_groups/${uid}/${groupId}`] = true;
+            });
+
+            db.ref().update(updates).then(() => {
+                showToast('Group created successfully!', 'success');
+                closeGroupModal();
+            }).catch(e => showToast('Failed to create group: ' + e.message));
+        }
+
+        function closeGroupModal() {
+            const modal = document.getElementById('groupModal');
+            if (modal) modal.remove();
+        }
+
+        function leaveGroup() {
+            if (!isGroup || !selectedUser) return;
+            const res = confirm("Are you sure you want to leave this group? You won't see new messages.");
+            if (!res) return;
+
+            const gid = selectedUser;
+            db.ref(`groups/${gid}/members/${currentUser.uid}`).remove();
+            db.ref(`user_groups/${currentUser.uid}/${gid}`).remove();
+
+            showToast("You have left the group.", "success");
+            goBack();
         }
 
         function logout() {

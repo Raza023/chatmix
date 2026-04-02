@@ -563,6 +563,9 @@
                             <button onclick="startAudioCall()" class="p-2 hover:bg-green-500/20 rounded-full transition text-green-400" title="Audio Call">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                             </button>
+                            <button id="addUserToGroupBtn" onclick="renderAddUserToGroupModal()" class="p-2 hover:bg-white/10 rounded-full transition text-blue-400 hidden" title="Add member to group">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                            </button>
                             <button class="p-2 hover:bg-white/10 rounded-full transition text-white/70 hover:text-white" title="Video Call">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                             </button>
@@ -945,10 +948,12 @@
                 actions.querySelector('button[title="Audio Call"]').classList.add('hidden');
                 document.getElementById('deleteChatBtn').classList.add('hidden');
                 document.getElementById('leaveGroupBtn').classList.remove('hidden');
+                document.getElementById('addUserToGroupBtn').classList.remove('hidden');
             } else {
                 actions.querySelector('button[title="Audio Call"]').classList.remove('hidden');
                 document.getElementById('deleteChatBtn').classList.remove('hidden');
                 document.getElementById('leaveGroupBtn').classList.add('hidden');
+                document.getElementById('addUserToGroupBtn').classList.add('hidden');
             }
 
             // Mobile Transition
@@ -1812,6 +1817,59 @@
 
             showToast("You have left the group.", "success");
             goBack();
+        }
+
+        // Add Member to Existing Group Logic
+        function renderAddUserToGroupModal() {
+            const modal = `
+            <div id="addUserModal" class="fixed inset-0 z-[150] bg-black/60 backdrop-blur-xl flex items-center justify-center p-4">
+                <div class="glass-panel w-full max-w-sm rounded-3xl p-8 border border-white/20 animate-fade-in">
+                    <h2 class="text-xl font-bold mb-4">Add Member</h2>
+                    <input id="addUserSearch" oninput="handleGroupAddUserSearch(this.value)" class="glass-input p-3 w-full rounded-xl text-sm mb-4" placeholder="Search by email...">
+                    <div id="addUserList" class="max-h-60 overflow-y-auto space-y-2 mb-6 custom-scroll">
+                        <p class="text-center text-gray-500 text-xs py-4">Search users to invite.</p>
+                    </div>
+                    <button onclick="document.getElementById('addUserModal').remove()" class="w-full p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors font-bold text-sm">Cancel</button>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modal);
+        }
+
+        function handleGroupAddUserSearch(val) {
+            const list = document.getElementById('addUserList');
+            if (!val) {
+                list.innerHTML = '<p class="text-center text-gray-500 text-xs py-4">Search users to invite.</p>';
+                return;
+            }
+            // Get current group members to ensure we don't list people already inside
+            const group = myGroups.find(g => g.gid === selectedUser);
+            if (!group) return;
+
+            const query = val.toLowerCase();
+            const filtered = usersData.filter(u => u.email.toLowerCase().includes(query) && !group.members[u.uid]);
+            
+            list.innerHTML = filtered.map(u => `
+                <div class="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                    <div class="flex items-center space-x-3">
+                        <p class="text-xs font-medium truncate">${escapeHTML(u.name)}</p>
+                    </div>
+                    <button onclick="addUserToGroup('${u.uid}')" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-[10px] font-bold transition-all transform active:scale-95">Add</button>
+                </div>
+            `).join('') || '<p class="text-center text-gray-500 text-xs py-4">No new users found.</p>';
+        }
+
+        function addUserToGroup(uid) {
+            if (!selectedUser || !isGroup) return;
+            const gid = selectedUser;
+            
+            const updates = {};
+            updates[`groups/${gid}/members/${uid}`] = true;
+            updates[`user_groups/${uid}/${gid}`] = true;
+
+            db.ref().update(updates).then(() => {
+                showToast('Member added successfully!', 'success');
+                document.getElementById('addUserModal').remove();
+            }).catch(e => showToast('Failed to add member: ' + e.message));
         }
 
         function logout() {

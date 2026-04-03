@@ -766,7 +766,7 @@
             // WATCH GROUPS
             db.ref('user_groups/' + currentUser.uid).on('value', snap => {
                 const groupIds = snap.val() || {};
-                
+
                 // Clear existing group listeners to prevent duplicates
                 myGroups.forEach(g => {
                     if (g.gid) db.ref('groups/' + g.gid).off('value');
@@ -808,7 +808,7 @@
             let initialLoad = true;
             listeners[gid] = db.ref('messages/' + gid).on('child_added', msgSnap => {
                 const msg = msgSnap.val();
-                
+
                 // Group Receipts: Mark as Delivered (2)
                 if (msg.sender !== currentUser.uid && (!msg.receipts || msg.receipts[currentUser.uid] < 2)) {
                     db.ref('messages/' + gid + '/' + msgSnap.key + '/receipts/' + currentUser.uid).set(2);
@@ -835,7 +835,7 @@
                 if (msg.sender !== currentUser.uid && (!msg.status || msg.status < 2)) {
                     db.ref('messages/' + id + '/' + msgSnap.key).update({ status: 2 });
                 }
-                
+
                 // Group Receipts for background messages (rare but for safety)
                 if (isGroup && msg.sender !== currentUser.uid && (!msg.receipts || msg.receipts[currentUser.uid] < 2)) {
                     db.ref('messages/' + id + '/' + msgSnap.key + '/receipts/' + currentUser.uid).set(2);
@@ -961,7 +961,7 @@
             // Hide calling for groups for now
             if (isGroup) {
                 actions.querySelector('button[title="Audio Call"]').classList.add('hidden');
-                
+
                 // Find group to check member count
                 const group = myGroups.find(g => g.gid === uid);
                 const memberCount = group ? Object.keys(group.members || {}).length : 0;
@@ -1018,7 +1018,7 @@
 
             const id = chatId(currentUser.uid, selectedUser);
             const updates = {};
-            
+
             if (isGroup) {
                 // Deep clean for Groups
                 updates[`messages/${selectedUser}`] = null;
@@ -1282,7 +1282,7 @@
                     }
 
                     const senderName = isMine ? 'You' : (document.getElementById('selectedUserName').innerText);
-                    
+
                     // For groups, we need to find the specific sender's alias correctly
                     let actualSenderName = senderName;
                     if (isGroup && !isMine) {
@@ -1346,7 +1346,7 @@
                     if (child.id && (child.id.startsWith('msg-') || child.id.startsWith('date-'))) {
                         let key = child.id;
                         if (key.startsWith('msg-')) key = key.replace('msg-', '');
-                        
+
                         // For date dividers, we keep the full ID in currentKeys
                         if (!currentKeys.has(key)) {
                             child.remove();
@@ -1662,11 +1662,11 @@
 
             if (date.toDateString() === today.toDateString()) return "Today";
             if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-            
-            return date.toLocaleDateString(undefined, { 
-                day: 'numeric', 
-                month: 'short', 
-                year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined 
+
+            return date.toLocaleDateString(undefined, {
+                day: 'numeric',
+                month: 'short',
+                year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
             });
         }
 
@@ -1679,7 +1679,7 @@
                 // Everyone except the sender must have a receipt
                 const requiredReceipts = groupTotalCount - 1;
                 const receiptEntries = Object.entries(receipts).filter(([uid]) => uid !== msg.sender);
-                
+
                 const deliveredCount = receiptEntries.filter(([_, s]) => s >= 2).length;
                 const readCount = receiptEntries.filter(([_, s]) => s === 3).length;
 
@@ -1870,7 +1870,7 @@
         function createGroup() {
             const name = document.getElementById('groupName').value.trim();
             if (!name) return showToast('Please enter a group name.');
-            
+
             if (name.length > 30) {
                 return showToast('Group name cannot exceed 30 characters.');
             }
@@ -1944,7 +1944,7 @@
 
             const query = val.toLowerCase();
             const filtered = usersData.filter(u => u.email.toLowerCase().includes(query) && !group.members[u.uid]);
-            
+
             list.innerHTML = filtered.map(u => `
                 <div class="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
                     <div class="flex items-center space-x-3">
@@ -1958,7 +1958,7 @@
         function addUserToGroup(uid) {
             if (!selectedUser || !isGroup) return;
             const gid = selectedUser;
-            
+
             const updates = {};
             updates[`groups/${gid}/members/${uid}`] = true;
             updates[`user_groups/${uid}/${gid}`] = true;
@@ -1977,7 +1977,7 @@
 
             const now = Date.now();
             const memberIds = Object.keys(group.members || {});
-            
+
             // Map IDs to available user data + myself
             const members = memberIds.map(uid => {
                 if (uid === currentUser.uid) return { name: 'You', email: currentUser.email, online: true };
@@ -2040,7 +2040,7 @@
 
             // Update Avatar
             avatar.innerHTML = myData.avatar ? `<img src="${myData.avatar}" class="w-full h-full object-cover">` : currentUser.email[0].toUpperCase();
-            
+
             // Update Name
             if (nameEl) nameEl.innerText = myData.name || currentUser.email;
         }
@@ -2089,7 +2089,7 @@
             }
 
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 tempAvatarData = e.target.result;
                 document.getElementById('profilePreview').innerHTML = `<img src="${tempAvatarData}" class="w-full h-full object-cover">`;
                 showToast("Image ready to save!", "success");

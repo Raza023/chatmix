@@ -1029,10 +1029,11 @@
 
             const actions = document.getElementById('chatActions');
             actions.classList.remove('hidden');
-            // Hide calling for groups for now
-            if (isGroup) {
-                actions.querySelector('button[title="Audio Call"]').classList.add('hidden');
+            
+            // Always show Audio Call button for both Individual and Group
+            actions.querySelector('button[title="Audio Call"]').classList.remove('hidden');
 
+            if (isGroup) {
                 // Find group to check member count
                 const group = myGroups.find(g => g.gid === uid);
                 const memberCount = group ? Object.keys(group.members || {}).length : 0;
@@ -1499,13 +1500,15 @@
         }
 
         /* --- Audio Calling System --- */
+        let pcs = {}; // For Group Mesh (uid -> PC)
+        let incomingCallGroupId = null;
 
         function initCallListener() {
             // Listen for private incoming call notifications in MY inbox
             db.ref('user_calls/' + currentUser.uid).on('value', snap => {
                 const data = snap.val();
                 if (data && data.status === 'offered') {
-                    showIncomingCall(data.callId, data.from);
+                    showIncomingCall(data.callId, data.from, data.isGroup, data.groupId);
                 }
             });
         }
@@ -1523,77 +1526,94 @@
 
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                pc = new RTCPeerConnection(config);
-                localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-
-                pc.onicecandidate = e => {
-                    if (e.candidate) {
-                        db.ref(`calls/${currentCallId}/candidates`).push(e.candidate.toJSON());
-                    }
-                };
-
-                pc.ontrack = e => {
-                    document.getElementById('remoteAudio').srcObject = e.streams[0];
-                };
-
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-
+                
                 const callRef = db.ref('calls').push();
                 currentCallId = callRef.key;
 
-                const callData = {
-                    from: currentUser.uid,
-                    to: selectedUser,
-                    offer: { sdp: offer.sdp, type: offer.type },
-                    status: 'offered',
-                    timestamp: Date.now()
-                };
+                if (isGroup) {
+                    incomingCallGroupId = selectedUser;
+                    await callRef.set({ isGroup: true, groupId: selectedUser, participants: { [currentUser.uid]: true }, timestamp: Date.now(), status: 'active' });
+                    
+                    // Notify all group members
+                    const group = myGroups.find(g => g.gid === selectedUser);
+                    if (group && group.members) {
+                        for (let uid in group.members) {
+                            if (uid !== currentUser.uid) {
+                                db.ref('user_calls/' + uid).set({ callId: currentCallId, from: currentUser.uid, status: 'offered', isGroup: true, groupId: selectedUser });
+                            }
+                        }
+                    }
+                    listenForGroupSignals();
+                    document.getElementById('callStatus').innerText = 'Waiting for others...';
+                } else {
+                    incomingCallGroupId = null;
+                    pc = new RTCPeerConnection(config);
+                    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-                await callRef.set(callData);
+                    pc.onicecandidate = e => {
+                        if (e.candidate) {
+                            db.ref(`calls/${currentCallId}/candidates`).push(e.candidate.toJSON());
+                        }
+                    };
 
-                // Notify RECIPIENT through their private inbox
-                db.ref('user_calls/' + selectedUser).set({
-                    callId: currentCallId,
-                    from: currentUser.uid,
-                    status: 'offered'
-                });
+                    pc.ontrack = e => {
+                        document.getElementById('remoteAudio').srcObject = e.streams[0];
+                    };
 
-                // Auto-stop call after 2 mins
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+
+                    await callRef.set({
+                        from: currentUser.uid,
+                        to: selectedUser,
+                        offer: { sdp: offer.sdp, type: offer.type },
+                        status: 'offered',
+                        timestamp: Date.now()
+                    });
+
+                    // Notify RECIPIENT
+                    db.ref('user_calls/' + selectedUser).set({
+                        callId: currentCallId,
+                        from: currentUser.uid,
+                        status: 'offered'
+                    });
+                }
+
+                // Auto-stop call after 2 mins if no active connection (mostly for individual)
                 clearTimeout(callTimeoutTimer);
                 callTimeoutTimer = setTimeout(() => {
-                    if (currentCallId) {
+                    if (currentCallId && (!isGroup && !pc.currentRemoteDescription)) {
                         showToast("No answer. Call ended.", "success");
                         rejectCall();
                     }
                 }, 120000);
 
-                // Listen for status changes (Answered, Ringing, Rejected)
-                db.ref(`calls/${currentCallId}`).on('value', async s => {
-                    const data = s.val();
-                    if (!data) return;
+                // Listen for individual status changes
+                if (!isGroup) {
+                    db.ref(`calls/${currentCallId}`).on('value', async s => {
+                        const data = s.val();
+                        if (!data) return;
 
-                    if (data.status === 'ringing') {
-                        document.getElementById('callStatus').innerText = 'Ringing...';
-                    } else if (data.status === 'answered' && !pc.currentRemoteDescription) {
-                        clearTimeout(callTimeoutTimer);
-                        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                        document.getElementById('callStatus').innerText = 'Connected';
+                        if (data.status === 'ringing') {
+                            document.getElementById('callStatus').innerText = 'Ringing...';
+                        } else if (data.status === 'answered' && !pc.currentRemoteDescription) {
+                            clearTimeout(callTimeoutTimer);
+                            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                            document.getElementById('callStatus').innerText = 'Connected';
 
-                        // Clear notification
-                        db.ref('user_calls/' + selectedUser).remove();
+                            db.ref('user_calls/' + selectedUser).remove();
 
-                        // Candidates must only be added AFTER remote description is set
-                        db.ref(`calls/${currentCallId}/candidates`).on('child_added', snap => {
-                            const candid = snap.val();
-                            if (candid.from !== currentUser.uid && pc.remoteDescription) {
-                                pc.addIceCandidate(new RTCIceCandidate(candid)).catch(e => console.warn("ICE Error:", e));
-                            }
-                        });
-                    } else if (data.status === 'rejected') {
-                        endCallUI();
-                    }
-                });
+                            db.ref(`calls/${currentCallId}/candidates`).on('child_added', snap => {
+                                const candid = snap.val();
+                                if (candid.from !== currentUser.uid && pc.remoteDescription) {
+                                    pc.addIceCandidate(new RTCIceCandidate(candid)).catch(e => console.warn("ICE Error:", e));
+                                }
+                            });
+                        } else if (data.status === 'rejected') {
+                            endCallUI();
+                        }
+                    });
+                }
 
             } catch (err) {
                 showToast("Microphone access required for calls.");
@@ -1601,16 +1621,22 @@
             }
         }
 
-        async function showIncomingCall(callId, fromUid) {
+        async function showIncomingCall(callId, fromUid, isGroupObj = false, groupId = null) {
             currentCallId = callId;
+            incomingCallGroupId = isGroupObj ? groupId : null;
+
             const data = usersData.find(u => u.uid === fromUid);
-            const name = data ? data.name : 'Unknown';
+            let name = data ? data.name : 'Unknown';
+            if (isGroupObj && groupId) {
+                const grp = myGroups.find(g => g.gid === groupId);
+                if (grp) name = `Group Call: ${grp.name}`;
+            }
 
             document.getElementById('callModal').classList.remove('hidden');
             document.getElementById('callAvatar').innerText = name.split(' ').map(n => n[0]).join('');
             document.getElementById('callName').innerText = name;
             document.getElementById('callStatus').innerText = 'Incoming Call...';
-            document.getElementById('acceptBtn').classList.add('hidden');
+            document.getElementById('acceptBtn').classList.remove('hidden');
 
             // Notify caller that we are ringing
             db.ref(`calls/${callId}`).update({ status: 'ringing' });
@@ -1645,52 +1671,125 @@
 
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                pc = new RTCPeerConnection(config);
-                localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+                
+                if (incomingCallGroupId) {
+                    db.ref(`calls/${currentCallId}/participants/${currentUser.uid}`).set(true);
+                    db.ref('user_calls/' + currentUser.uid).remove();
 
-                pc.onicecandidate = e => {
-                    if (e.candidate) {
-                        db.ref(`calls/${currentCallId}/candidates`).push({ ...e.candidate.toJSON(), from: currentUser.uid });
+                    const snap = await db.ref(`calls/${currentCallId}/participants`).once('value');
+                    const participants = snap.val() || {};
+                    listenForGroupSignals();
+
+                    for (let uid in participants) {
+                        if (uid !== currentUser.uid) {
+                            await createGroupOffer(uid);
+                        }
                     }
-                };
+                    document.getElementById('callStatus').innerText = 'Connected';
+                } else {
+                    pc = new RTCPeerConnection(config);
+                    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-                pc.ontrack = e => {
-                    document.getElementById('remoteAudio').srcObject = e.streams[0];
-                };
+                    pc.onicecandidate = e => {
+                        if (e.candidate) {
+                            db.ref(`calls/${currentCallId}/candidates`).push({ ...e.candidate.toJSON(), from: currentUser.uid });
+                        }
+                    };
 
-                const callSnap = await db.ref(`calls/${currentCallId}`).once('value');
-                const callData = callSnap.val();
+                    pc.ontrack = e => {
+                        document.getElementById('remoteAudio').srcObject = e.streams[0];
+                    };
 
-                await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
+                    const callSnap = await db.ref(`calls/${currentCallId}`).once('value');
+                    const callData = callSnap.val();
 
-                await db.ref(`calls/${currentCallId}`).update({
-                    answer: { sdp: answer.sdp, type: answer.type },
-                    status: 'answered'
-                });
+                    await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
 
-                // Candidates listener - start after remote description is ready
-                db.ref(`calls/${currentCallId}/candidates`).on('child_added', s => {
-                    const candid = s.val();
-                    if (candid.from !== currentUser.uid && pc.remoteDescription) {
-                        pc.addIceCandidate(new RTCIceCandidate(candid)).catch(e => console.warn("ICE Error:", e));
-                    }
-                });
+                    await db.ref(`calls/${currentCallId}`).update({
+                        answer: { sdp: answer.sdp, type: answer.type },
+                        status: 'answered'
+                    });
 
-                document.getElementById('callStatus').innerText = 'Connected';
+                    db.ref(`calls/${currentCallId}/candidates`).on('child_added', s => {
+                        const candid = s.val();
+                        if (candid.from !== currentUser.uid && pc.remoteDescription) {
+                            pc.addIceCandidate(new RTCIceCandidate(candid)).catch(e => console.warn("ICE Error:", e));
+                        }
+                    });
+
+                    document.getElementById('callStatus').innerText = 'Connected';
+                }
 
             } catch (err) {
-                showToast("Microphone error.");
+                console.error("acceptCall error:", err);
+                showToast("Error answering call: " + err.message);
                 rejectCall();
             }
         }
 
+        // --- Group WebRTC Mesh Helpers ---
+        function createGroupPC(targetUid) {
+            const peer = new RTCPeerConnection(config);
+            pcs[targetUid] = peer;
+            localStream.getTracks().forEach(t => peer.addTrack(t, localStream));
+
+            peer.onicecandidate = e => {
+                if (e.candidate) db.ref(`calls/${currentCallId}/signals`).push({ type: 'candidate', candidate: e.candidate.toJSON(), from: currentUser.uid, to: targetUid });
+            };
+            peer.ontrack = e => {
+                let audio = document.getElementById(`audio_${targetUid}`);
+                if (!audio) {
+                    audio = document.createElement('audio');
+                    audio.id = `audio_${targetUid}`;
+                    audio.autoplay = true;
+                    document.body.appendChild(audio);
+                }
+                audio.srcObject = e.streams[0];
+            };
+            return peer;
+        }
+
+        async function createGroupOffer(targetUid) {
+            const peer = createGroupPC(targetUid);
+            const offer = await peer.createOffer();
+            await peer.setLocalDescription(offer);
+            db.ref(`calls/${currentCallId}/signals`).push({ type: 'offer', offer: {sdp: offer.sdp, type: offer.type}, from: currentUser.uid, to: targetUid });
+        }
+
+        function listenForGroupSignals() {
+            db.ref(`calls/${currentCallId}/signals`).on('child_added', async snap => {
+                const signal = snap.val();
+                if (signal.to !== currentUser.uid) return;
+
+                if (signal.type === 'offer') {
+                    const peer = createGroupPC(signal.from);
+                    await peer.setRemoteDescription(new RTCSessionDescription(signal.offer));
+                    const answer = await peer.createAnswer();
+                    await peer.setLocalDescription(answer);
+                    db.ref(`calls/${currentCallId}/signals`).push({ type: 'answer', answer: {sdp: answer.sdp, type: answer.type}, from: currentUser.uid, to: signal.from });
+                } else if (signal.type === 'answer') {
+                    const peer = pcs[signal.from];
+                    if (peer) await peer.setRemoteDescription(new RTCSessionDescription(signal.answer));
+                } else if (signal.type === 'candidate') {
+                    const peer = pcs[signal.from];
+                    if (peer && peer.remoteDescription) {
+                        peer.addIceCandidate(new RTCIceCandidate(signal.candidate)).catch(e=>console.warn(e));
+                    }
+                }
+            });
+        }
+
         function rejectCall() {
             if (currentCallId) {
-                db.ref(`calls/${currentCallId}`).update({ status: 'rejected' });
-                db.ref(`calls/${currentCallId}`).remove();
-                db.ref(`user_calls/${currentUser.uid}`).remove();
+                if (incomingCallGroupId) {
+                    db.ref(`user_calls/${currentUser.uid}`).remove();
+                } else {
+                    db.ref(`calls/${currentCallId}`).update({ status: 'rejected' });
+                    db.ref(`calls/${currentCallId}`).remove();
+                    db.ref(`user_calls/${currentUser.uid}`).remove();
+                }
             }
             endCallUI();
         }
@@ -1705,9 +1804,16 @@
             }
             clearTimeout(callTimeoutTimer);
 
+            if (incomingCallGroupId && currentCallId) db.ref(`calls/${currentCallId}/participants/${currentUser.uid}`).remove();
+
             pc = null;
+            Object.values(pcs).forEach(p => p.close());
+            pcs = {};
+            document.querySelectorAll('audio[id^="audio_"]').forEach(el => el.remove());
+            
             localStream = null;
             currentCallId = null;
+            incomingCallGroupId = null;
             isMuted = false;
 
             // Reset mute button UI

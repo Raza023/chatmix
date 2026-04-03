@@ -272,6 +272,17 @@
             window.console.info = noop;
         })();
 
+        // Global Helpers
+        function togglePassword(inputId, btn) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const isPass = input.type === 'password';
+            input.type = isPass ? 'text' : 'password';
+            btn.innerHTML = isPass ? 
+                `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.643-9.943-6.442a5.08 5.08 0 011.66-1.393m1.423-1.423A9.97 9.97 0 0112 5c4.478 0 8.268 2.643 9.943 6.442a5.08 5.08 0 01-1.66 1.393M9.88 9.88l4.24 4.24m-1.057-4.243l-4.242 4.243M3 3l18 18" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>` :
+                `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>`;
+        }
+
         // Cookie Management Helpers
         function setCookie(name, value, minutes) {
             let expires = "";
@@ -373,7 +384,12 @@
                 </div>
                 <div class="space-y-4">
                     <input id="email" maxlength="100" class="glass-input p-4 w-full rounded-xl" placeholder="Email Address">
-                    <input id="password" maxlength="50" type="password" onkeydown="if(event.key === 'Enter') login()" class="glass-input p-4 w-full rounded-xl" placeholder="Password">
+                    <div class="relative">
+                        <input id="password" maxlength="50" type="password" onkeydown="if(event.key === 'Enter') login()" class="glass-input p-4 pr-12 w-full rounded-xl" placeholder="Password">
+                        <button onclick="togglePassword('password', this)" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                        </button>
+                    </div>
                     <button onclick="login()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg mt-4">Login</button>
                     <p class="text-center mt-6 text-sm text-gray-400">
                         Don't have an account? <span onclick="renderSignup()" class="text-purple-400 cursor-pointer hover:underline font-semibold">Sign up</span>
@@ -453,7 +469,12 @@
             app.innerHTML = `
             <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in">
                 <h2 class="text-2xl font-bold mb-6 text-center">Secure Your Account</h2>
-                <input id="password" maxlength="50" onkeydown="if(event.key === 'Enter') createAccount()" type="password" class="glass-input p-4 w-full rounded-xl mb-4" placeholder="Strong Password">
+                <div class="relative mb-4">
+                    <input id="password" maxlength="50" onkeydown="if(event.key === 'Enter') createAccount()" type="password" class="glass-input p-4 pr-12 w-full rounded-xl" placeholder="Strong Password">
+                    <button onclick="togglePassword('password', this)" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                    </button>
+                </div>
                 <button onclick="createAccount()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">Complete Registration</button>
             </div>`;
         }
@@ -2135,10 +2156,25 @@
                     <p class="text-xs text-white/40 mb-8 px-4">Update your password to keep your conversations private.</p>
 
                     <div class="space-y-4 mb-10">
-                        <input id="oldPassword" type="password" class="glass-input p-4 w-full rounded-2xl text-center text-sm" placeholder="Current Password">
+                        <div class="relative">
+                            <input id="oldPassword" type="password" class="glass-input p-4 pr-12 w-full rounded-2xl text-center text-sm" placeholder="Current Password">
+                            <button onclick="togglePassword('oldPassword', this)" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                            </button>
+                        </div>
                         <div class="h-px bg-white/5 mx-6"></div>
-                        <input id="newPassword" type="password" class="glass-input p-4 w-full rounded-2xl text-center text-sm" placeholder="New Password">
-                        <input id="confirmPassword" type="password" class="glass-input p-4 w-full rounded-2xl text-center text-sm" placeholder="Confirm Password">
+                        <div class="relative">
+                            <input id="newPassword" type="password" class="glass-input p-4 pr-12 w-full rounded-2xl text-center text-sm" placeholder="New Password">
+                            <button onclick="togglePassword('newPassword', this)" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                            </button>
+                        </div>
+                        <div class="relative">
+                            <input id="confirmPassword" type="password" class="glass-input p-4 pr-12 w-full rounded-2xl text-center text-sm" placeholder="Confirm Password">
+                            <button onclick="togglePassword('confirmPassword', this)" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="flex space-x-3">

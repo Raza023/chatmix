@@ -534,8 +534,13 @@
                                 </button>
                             </div>
                         </div>
-                        <div id="searchBarContainer" class="hidden animate-fade-in">
-                            <input id="userSearch" oninput="handleSearch(this.value)" class="glass-input p-3 w-full rounded-xl text-sm" placeholder="Search by email...">
+                        <div id="searchBarContainer" class="hidden animate-fade-in mb-2">
+                            <div class="relative">
+                                <input id="userSearch" oninput="handleSearch(this.value)" class="glass-input p-3 pr-10 w-full rounded-xl text-sm" placeholder="Search by email...">
+                                <button onclick="toggleSearch()" class="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-white/40 hover:text-white transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div class="p-4 flex-1 overflow-y-auto" id="users"></div>

@@ -1283,28 +1283,43 @@
                     if (group) groupMemberCount = Object.keys(group.members).length;
                 }
 
-                let lastDateLabel = "";
+                // Collect all messages first, then render in chronological order
+                const allMessages = [];
                 snap.forEach(child => {
-                    const m = child.val();
-                    const key = child.key;
+                    allMessages.push({ key: child.key, val: child.val() });
+                });
+                // Sort by timestamp ascending to guarantee correct date-divider order
+                allMessages.sort((a, b) => (a.val.time || 0) - (b.val.time || 0));
+
+                // Remove ALL existing date dividers so they are re-inserted in correct order
+                Array.from(chatBox.children).forEach(child => {
+                    if (child.id && child.id.startsWith('date-')) child.remove();
+                });
+
+                let lastDateLabel = "";
+                allMessages.forEach(({ key, val: m }) => {
                     currentKeys.add(key);
 
-                    // Date Divider Logic
+                    // Date Divider Logic — insert divider before the first message of each new date
                     const dateLabel = formatDividerDate(m.time);
                     const dateId = `date-${dateLabel.replace(/\s/g, '-')}`;
                     currentKeys.add(dateId);
 
                     if (dateLabel !== lastDateLabel) {
-                        let dateDiv = document.getElementById(dateId);
-                        if (!dateDiv) {
-                            dateDiv = document.createElement('div');
-                            dateDiv.id = dateId;
-                            dateDiv.className = "flex justify-center my-6 animate-fade-in";
-                            dateDiv.innerHTML = `
-                                <div class="glass-panel px-4 py-1.5 rounded-full border border-white/10 shadow-xl">
-                                    <span class="text-[10px] font-bold uppercase tracking-widest text-white/50">${dateLabel}</span>
-                                </div>
-                            `;
+                        // Always create a fresh divider and insert it before the message
+                        const dateDiv = document.createElement('div');
+                        dateDiv.id = dateId;
+                        dateDiv.className = "flex justify-center my-6 animate-fade-in";
+                        dateDiv.innerHTML = `
+                            <div class="glass-panel px-4 py-1.5 rounded-full border border-white/10 shadow-xl">
+                                <span class="text-[10px] font-bold uppercase tracking-widest text-white/50">${dateLabel}</span>
+                            </div>
+                        `;
+                        // Insert right before existing message el if it exists, else append
+                        const existingMsg = document.getElementById(`msg-${key}`);
+                        if (existingMsg) {
+                            chatBox.insertBefore(dateDiv, existingMsg);
+                        } else {
                             chatBox.appendChild(dateDiv);
                         }
                         lastDateLabel = dateLabel;

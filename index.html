@@ -273,6 +273,17 @@
         })();
 
         // Global Helpers
+        // Global Helpers
+        let renderScheduled = false;
+        function scheduleUserListRender() {
+            if (renderScheduled) return;
+            renderScheduled = true;
+            requestAnimationFrame(() => {
+                renderUserListActual();
+                renderScheduled = false;
+            });
+        }
+
         function togglePassword(inputId, btn) {
             const input = document.getElementById(inputId);
             if (!input) return;
@@ -485,6 +496,10 @@
             db.ref('pendingUsers/' + tempEmail.replace('.', '_')).once('value', snap => {
                 const data = snap.val();
 
+                const btn = document.querySelector('button');
+                btn.disabled = true;
+                btn.innerHTML = 'Syncing...';
+
                 auth.createUserWithEmailAndPassword(tempEmail, password)
                     .then(userCred => {
                         db.ref('users/' + userCred.user.uid).set({
@@ -496,7 +511,11 @@
                         currentUser = userCred.user;
                         renderChat();
                     })
-                    .catch(err => showToast(err.message));
+                    .catch(err => {
+                        showToast(err.message);
+                        btn.disabled = false;
+                        btn.innerHTML = 'Complete Registration';
+                    });
             });
         }
 
@@ -2114,22 +2133,33 @@
             const file = input.files[0];
             if (!file) return;
 
-            if (file.size > 1024 * 1024) { // 1MB limit for Realtime Database
-                return showToast("Image is too large. Max 1MB allowed.");
-            }
-
+            // Immediate compression for performance
             const reader = new FileReader();
             reader.onload = function (e) {
-                tempAvatarData = e.target.result;
-                document.getElementById('profilePreview').innerHTML = `<img src="${tempAvatarData}" class="w-full h-full object-cover">`;
-                showToast("Image ready to save!", "success");
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = 100;
+                    canvas.height = 100;
+                    ctx.drawImage(img, 0, 0, 100, 100);
+                    tempAvatarData = canvas.toDataURL('image/jpeg', 0.8);
+                    document.getElementById('profilePreview').innerHTML = `<img src="${tempAvatarData}" class="w-full h-full object-cover">`;
+                    showToast("Profile identity optimized!", "success");
+                };
+                img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
 
         function updateProfile() {
+            const btn = event.target;
+            const originalText = btn.innerHTML;
             const newName = document.getElementById('editAlias').value.trim();
             if (!newName) return showToast("Name cannot be empty.");
+
+            btn.disabled = true;
+            btn.innerHTML = 'Optimizing...';
 
             const updates = { name: newName };
             if (tempAvatarData) updates.avatar = tempAvatarData;
@@ -2138,7 +2168,11 @@
                 showToast("Profile updated successfully!", "success");
                 document.getElementById('profileModal').remove();
                 tempAvatarData = null;
-            }).catch(e => showToast("Update failed: " + e.message));
+            }).catch(e => {
+                showToast("Update failed: " + e.message);
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
         }
 
         function renderChangePasswordModal() {

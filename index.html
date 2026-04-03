@@ -546,7 +546,7 @@
 
             if (!email || !password) return showToast('Please enter both email and password.');
 
-            setBtnLoading(btn, true, 'Opening Vault...', originalText);
+            setBtnLoading(btn, true, 'Opening chatmix...', originalText);
 
             auth.signInWithEmailAndPassword(email, password)
                 .then(userCred => {

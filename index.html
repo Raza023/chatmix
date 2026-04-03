@@ -303,7 +303,7 @@
             if (!input) return;
             const isPass = input.type === 'password';
             input.type = isPass ? 'text' : 'password';
-            btn.innerHTML = isPass ? 
+            btn.innerHTML = isPass ?
                 `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.643-9.943-6.442a5.08 5.08 0 011.66-1.393m1.423-1.423A9.97 9.97 0 0112 5c4.478 0 8.268 2.643 9.943 6.442a5.08 5.08 0 01-1.66 1.393M9.88 9.88l4.24 4.24m-1.057-4.243l-4.242 4.243M3 3l18 18" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>` :
                 `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>`;
         }
@@ -592,10 +592,10 @@
                                 <button onclick="renderGroupModal()" class="p-2 hover:bg-white/10 rounded-full transition-colors text-white/70 hover:text-white" title="Create Group">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                                 </button>
-                                <button onclick="toggleSearch()" class="p-2 hover:bg-white/10 rounded-full transition-colors text-white/70 hover:text-white">
+                                <button onclick="toggleSearch()" class="p-2 hover:bg-white/10 rounded-full transition-colors text-white/70 hover:text-white" title="Search User By Email...">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                                 </button>
-                                <button onclick="logout()" class="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                <button onclick="logout()" class="p-2 hover:bg-white/10 rounded-full transition-colors" title="Logout">
                                     <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                                 </button>
                             </div>
@@ -1033,7 +1033,7 @@
 
             const actions = document.getElementById('chatActions');
             actions.classList.remove('hidden');
-            
+
             // Always show Audio Call button for both Individual and Group
             actions.querySelector('button[title="Audio Call"]').classList.remove('hidden');
 
@@ -1545,14 +1545,14 @@
 
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
+
                 const callRef = db.ref('calls').push();
                 currentCallId = callRef.key;
 
                 if (isGroup) {
                     incomingCallGroupId = selectedUser;
                     await callRef.set({ isGroup: true, groupId: selectedUser, participants: { [currentUser.uid]: { connected: true, isMuted: isMuted } }, timestamp: Date.now(), status: 'active' });
-                    
+
                     // Notify all group members
                     const group = myGroups.find(g => g.gid === selectedUser);
                     if (group && group.members) {
@@ -1692,7 +1692,7 @@
 
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
+
                 if (incomingCallGroupId) {
                     db.ref(`calls/${currentCallId}/participants/${currentUser.uid}`).set({ connected: true, isMuted: isMuted });
                     db.ref('user_calls/' + currentUser.uid).remove();
@@ -1768,11 +1768,11 @@
             }
             container.classList.remove('hidden');
             container.classList.add('flex');
-            
+
             let html = '';
             for (let uid in participants) {
                 const p = participants[uid];
-                if(p === true || (p && p.connected)) {
+                if (p === true || (p && p.connected)) {
                     const isUserMuted = p.isMuted === true;
                     const isMe = (uid === currentUser.uid);
                     let initial = '?';
@@ -1836,7 +1836,7 @@
             const peer = createGroupPC(targetUid);
             const offer = await peer.createOffer();
             await peer.setLocalDescription(offer);
-            db.ref(`calls/${currentCallId}/signals`).push({ type: 'offer', offer: {sdp: offer.sdp, type: offer.type}, from: currentUser.uid, to: targetUid });
+            db.ref(`calls/${currentCallId}/signals`).push({ type: 'offer', offer: { sdp: offer.sdp, type: offer.type }, from: currentUser.uid, to: targetUid });
         }
 
         function listenForGroupSignals() {
@@ -1849,14 +1849,14 @@
                     await peer.setRemoteDescription(new RTCSessionDescription(signal.offer));
                     const answer = await peer.createAnswer();
                     await peer.setLocalDescription(answer);
-                    db.ref(`calls/${currentCallId}/signals`).push({ type: 'answer', answer: {sdp: answer.sdp, type: answer.type}, from: currentUser.uid, to: signal.from });
+                    db.ref(`calls/${currentCallId}/signals`).push({ type: 'answer', answer: { sdp: answer.sdp, type: answer.type }, from: currentUser.uid, to: signal.from });
                 } else if (signal.type === 'answer') {
                     const peer = pcs[signal.from];
                     if (peer) await peer.setRemoteDescription(new RTCSessionDescription(signal.answer));
                 } else if (signal.type === 'candidate') {
                     const peer = pcs[signal.from];
                     if (peer && peer.remoteDescription) {
-                        peer.addIceCandidate(new RTCIceCandidate(signal.candidate)).catch(e=>console.warn(e));
+                        peer.addIceCandidate(new RTCIceCandidate(signal.candidate)).catch(e => console.warn(e));
                     }
                 }
             });
@@ -1891,7 +1891,7 @@
                 db.ref(`calls/${currentCallId}/participants`).off('value', callParticipantsListener);
                 callParticipantsListener = null;
             }
-            
+
             const groupMembersContainer = document.getElementById('groupCallMembers');
             if (groupMembersContainer) {
                 groupMembersContainer.innerHTML = '';
@@ -1904,7 +1904,7 @@
 
             pcs = {};
             document.querySelectorAll('audio[id^="audio_"]').forEach(el => el.remove());
-            
+
             localStream = null;
             currentCallId = null;
             incomingCallGroupId = null;
@@ -2220,7 +2220,7 @@
 
             const gid = selectedUser;
             const myName = myData ? myData.name : 'A participant';
-            
+
             // Push system message FIRST while we still have group permissions
             db.ref(`messages/${gid}`).push({
                 sender: currentUser.uid,
@@ -2231,7 +2231,7 @@
             }).then(() => {
                 db.ref(`groups/${gid}/members/${currentUser.uid}`).remove();
                 db.ref(`user_groups/${currentUser.uid}/${gid}`).remove();
-                
+
                 showToast("You have left the group.", "success");
                 goBack();
             }).catch(e => {
@@ -2290,7 +2290,7 @@
             const myName = myData ? myData.name : 'Someone';
             const addedUser = usersData.find(u => u.uid === uid);
             const addedName = addedUser ? addedUser.name : 'A user';
-            
+
             updates[`messages/${groupId}/${db.ref().push().key}`] = {
                 sender: currentUser.uid,
                 text: `${myName} added ${addedName} to the group.`,
@@ -2431,7 +2431,7 @@
             const reader = new FileReader();
             reader.onload = function (e) {
                 const img = new Image();
-                img.onload = function() {
+                img.onload = function () {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
                     canvas.width = 100;
@@ -2532,7 +2532,7 @@
             setBtnLoading(btn, true, 'Verifying Credentials...', originalText);
 
             const cred = firebase.auth.EmailAuthProvider.credential(currentUser.email, oldPass);
-            
+
             // Re-authenticate first for safety
             auth.currentUser.reauthenticateWithCredential(cred).then(() => {
                 auth.currentUser.updatePassword(newPass).then(() => {

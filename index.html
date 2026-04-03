@@ -2135,6 +2135,8 @@
                     <p class="text-xs text-white/40 mb-8 px-4">Update your password to keep your conversations private.</p>
 
                     <div class="space-y-4 mb-10">
+                        <input id="oldPassword" type="password" class="glass-input p-4 w-full rounded-2xl text-center text-sm" placeholder="Current Password">
+                        <div class="h-px bg-white/5 mx-6"></div>
                         <input id="newPassword" type="password" class="glass-input p-4 w-full rounded-2xl text-center text-sm" placeholder="New Password">
                         <input id="confirmPassword" type="password" class="glass-input p-4 w-full rounded-2xl text-center text-sm" placeholder="Confirm Password">
                     </div>
@@ -2155,21 +2157,28 @@
         }
 
         function handlePasswordUpdate() {
-            const pass = document.getElementById('newPassword').value;
-            const conf = document.getElementById('confirmPassword').value;
+            const oldPass = document.getElementById('oldPassword').value;
+            const newPass = document.getElementById('newPassword').value;
+            const confPass = document.getElementById('confirmPassword').value;
 
-            if (pass.length < 6) return showToast("Password should be at least 6 characters.");
-            if (pass !== conf) return showToast("Passwords do not match.");
+            if (!oldPass) return showToast("Enter your current password.");
+            if (newPass.length < 6) return showToast("New password should be at least 6 characters.");
+            if (newPass !== confPass) return showToast("New passwords do not match.");
 
-            auth.currentUser.updatePassword(pass).then(() => {
-                showToast("Password updated successfully!", "success");
-                document.getElementById('passwordModal').remove();
-                document.getElementById('profileModal').remove();
+            const cred = firebase.auth.EmailAuthProvider.credential(currentUser.email, oldPass);
+            
+            // Re-authenticate first for safety
+            auth.currentUser.reauthenticateWithCredential(cred).then(() => {
+                auth.currentUser.updatePassword(newPass).then(() => {
+                    showToast("Password updated successfully!", "success");
+                    document.getElementById('passwordModal').remove();
+                    document.getElementById('profileModal').remove();
+                }).catch(e => showToast("Update failed: " + e.message));
             }).catch(e => {
-                if (e.code === 'auth/requires-recent-login') {
-                    showToast("Session expired. Please log out and log in again to update password.");
+                if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials' || (e.message && e.message.includes('invalid-login-credentials'))) {
+                    showToast("Incorrect current password. Please try again.");
                 } else {
-                    showToast(e.message);
+                    showToast("Verification failed: " + e.message);
                 }
             });
         }

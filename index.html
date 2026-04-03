@@ -274,6 +274,20 @@
 
         // Global Helpers
         // Global Helpers
+        function setBtnLoading(btn, isLoading, text = 'Loading...', original = 'Button') {
+            if (!btn) return;
+            btn.disabled = isLoading;
+            btn.style.opacity = isLoading ? '0.7' : '1';
+            btn.style.cursor = isLoading ? 'not-allowed' : 'pointer';
+            btn.innerHTML = isLoading ? `<span class="flex items-center justify-center space-x-2">
+                <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>${text}</span>
+            </span>` : original;
+        }
+
         let renderScheduled = false;
         function scheduleUserListRender() {
             if (renderScheduled) return;
@@ -431,24 +445,24 @@
         function sendCode() {
             tempEmail = document.getElementById('email').value;
             const name = document.getElementById('name').value;
+            const btn = event.target;
+            const originalText = 'Get Started';
+
             if (!tempEmail || !name) return showToast('Please fill all fields to continue.');
 
-            verificationCode = Math.floor(1000 + Math.random() * 9000);
+            setBtnLoading(btn, true, 'Sending OTP...', originalText);
 
-            const templateParams = {
-                to_email: tempEmail,
-                name: name,
-                otp_code: verificationCode
-            };
+            verificationCode = Math.floor(1000 + Math.random() * 9000);
+            const templateParams = { to_email: tempEmail, name: name, otp_code: verificationCode };
 
             emailjs.send("service_ijfry7u", "template_igxg83j", templateParams)
                 .then(function () {
                     showToast('Verification code sent to email!', 'success');
-
                     db.ref('pendingUsers/' + tempEmail.replace('.', '_')).set({ name, code: verificationCode });
                     renderVerify();
                 }, function (error) {
-                    showToast('Failed to send email. Please try again later.');
+                    showToast('Failed to send email. Check your connection.');
+                    setBtnLoading(btn, false, '', originalText);
                 });
         }
 
@@ -464,13 +478,18 @@
 
         function verifyCode() {
             const entered = document.getElementById('code').value;
+            const btn = event.target;
+            const originalText = 'Verify & Continue';
+
+            setBtnLoading(btn, true, 'Verifying...', originalText);
 
             db.ref('pendingUsers/' + tempEmail.replace('.', '_')).once('value', snap => {
                 const data = snap.val();
                 if (data && entered == data.code) {
                     renderCreatePassword();
                 } else {
-                    showToast('Incorrect verification code. Please check your email.');
+                    showToast('Incorrect verification code.');
+                    setBtnLoading(btn, false, '', originalText);
                     renderSignup();
                 }
             });
@@ -492,13 +511,14 @@
 
         function createAccount() {
             const password = document.getElementById('password').value;
+            if (!password) return showToast('Please set a password.');
 
             db.ref('pendingUsers/' + tempEmail.replace('.', '_')).once('value', snap => {
                 const data = snap.val();
+                const btn = document.querySelector('button[onclick="createAccount()"]');
+                const originalText = 'Complete Registration';
 
-                const btn = document.querySelector('button');
-                btn.disabled = true;
-                btn.innerHTML = 'Syncing...';
+                setBtnLoading(btn, true, 'Deploying Profile...', originalText);
 
                 auth.createUserWithEmailAndPassword(tempEmail, password)
                     .then(userCred => {
@@ -513,8 +533,7 @@
                     })
                     .catch(err => {
                         showToast(err.message);
-                        btn.disabled = false;
-                        btn.innerHTML = 'Complete Registration';
+                        setBtnLoading(btn, false, '', originalText);
                     });
             });
         }
@@ -522,11 +541,16 @@
         function login() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            const btn = event.target.closest('button') || document.querySelector('button[onclick="login()"]');
+            const originalText = 'Login';
+
+            if (!email || !password) return showToast('Please enter both email and password.');
+
+            setBtnLoading(btn, true, 'Opening Vault...', originalText);
 
             auth.signInWithEmailAndPassword(email, password)
                 .then(userCred => {
                     const uid = userCred.user.uid;
-                    // Check if user is actually authorized in our database users node
                     db.ref('users/' + uid).once('value', snap => {
                         if (snap.exists()) {
                             currentUser = userCred.user;
@@ -536,6 +560,7 @@
                         } else {
                             auth.signOut();
                             showToast('Access Denied: You are not an authorized user in this system.');
+                            setBtnLoading(btn, false, '', originalText);
                         }
                     });
                 })
@@ -547,6 +572,7 @@
                     } else {
                         showToast(err.message);
                     }
+                    setBtnLoading(btn, false, '', originalText);
                 });
         }
 
@@ -1569,7 +1595,7 @@
             document.getElementById('callAvatar').innerText = name.split(' ').map(n => n[0]).join('');
             document.getElementById('callName').innerText = name;
             document.getElementById('callStatus').innerText = 'Incoming Call...';
-            document.getElementById('acceptBtn').classList.remove('hidden');
+            document.getElementById('acceptBtn').classList.add('hidden');
 
             // Notify caller that we are ringing
             db.ref(`calls/${callId}`).update({ status: 'ringing' });
@@ -1869,7 +1895,7 @@
             <div id="groupModal" class="fixed inset-0 z-[150] bg-black/60 backdrop-blur-xl flex items-center justify-center p-4">
                 <div class="glass-panel w-full max-w-md rounded-3xl p-8 border border-white/20 animate-fade-in">
                     <h2 class="text-2xl font-bold mb-4">Create New Group</h2>
-                    <input id="groupName" class="glass-input p-4 w-full rounded-xl mb-4" placeholder="Group Name" maxlength="30">
+                    <input id="newGroupName" class="glass-input p-4 w-full rounded-xl mb-4" placeholder="Group Name" maxlength="30">
                     <div class="relative mb-4">
                         <input id="groupUserSearch" oninput="handleGroupUserSearch(this.value)" class="glass-input p-3 w-full rounded-xl text-sm" placeholder="Search members by email...">
                     </div>
@@ -1913,34 +1939,40 @@
         }
 
         function createGroup() {
-            const name = document.getElementById('groupName').value.trim();
-            if (!name) return showToast('Please enter a group name.');
+            const name = document.getElementById('newGroupName').value.trim();
+            const btn = event.target;
+            const originalText = 'Create Group';
 
-            if (name.length > 30) {
-                return showToast('Group name cannot exceed 30 characters.');
-            }
-
-            const abnormalChars = /[<>]/;
-            if (abnormalChars.test(name)) {
-                return showToast('Invalid group name! Scripting characters are not allowed.');
-            }
-
+            if (!name) return showToast("Group name is required.");
+            if (name.length > 30) return showToast("Group name is too long.");
+            if (/[<>]/.test(name)) return showToast("Scripting characters not allowed!");
             if (groupSelectedMembers.size === 0) return showToast('Please select at least one member.');
+
+            setBtnLoading(btn, true, 'Forging Group...', originalText);
 
             const groupId = 'group_' + Date.now();
             const members = { [currentUser.uid]: true };
             groupSelectedMembers.forEach(uid => members[uid] = true);
 
-            const updates = {};
-            updates[`groups/${groupId}`] = { name, members, createdBy: currentUser.uid, createdAt: Date.now() };
-            Object.keys(members).forEach(uid => {
-                updates[`user_groups/${uid}/${groupId}`] = true;
-            });
+            db.ref('groups/' + groupId).set({
+                name,
+                members,
+                createdBy: currentUser.uid,
+                createdAt: Date.now(),
+                isGroup: true
+            }).then(() => {
+                const groupUpdates = {};
+                Object.keys(members).forEach(uid => {
+                    groupUpdates[`user_groups/${uid}/${groupId}`] = true;
+                });
+                db.ref().update(groupUpdates);
 
-            db.ref().update(updates).then(() => {
-                showToast('Group created successfully!', 'success');
                 closeGroupModal();
-            }).catch(e => showToast('Failed to create group: ' + e.message));
+                showToast("Group created!", "success");
+            }).catch(e => {
+                showToast(e.message);
+                setBtnLoading(btn, false, '', originalText);
+            });
         }
 
         function closeGroupModal() {
@@ -1983,7 +2015,6 @@
                 list.innerHTML = '<p class="text-center text-gray-500 text-xs py-4">Search users to invite.</p>';
                 return;
             }
-            // Get current group members to ensure we don't list people already inside
             const group = myGroups.find(g => g.gid === selectedUser);
             if (!group) return;
 
@@ -1995,23 +2026,28 @@
                     <div class="flex items-center space-x-3">
                         <p class="text-xs font-medium truncate">${escapeHTML(u.name)}</p>
                     </div>
-                    <button onclick="addUserToGroup('${u.uid}')" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-[10px] font-bold transition-all transform active:scale-95">Add</button>
+                    <button onclick="addMemberToGroup('${u.uid}', '${selectedUser}')" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-[10px] font-bold transition-all transform active:scale-95">Add</button>
                 </div>
             `).join('') || '<p class="text-center text-gray-500 text-xs py-4">No new users found.</p>';
         }
 
-        function addUserToGroup(uid) {
-            if (!selectedUser || !isGroup) return;
-            const gid = selectedUser;
+        function addMemberToGroup(uid, groupId) {
+            const btn = event.target;
+            const originalText = 'Add';
+
+            setBtnLoading(btn, true, 'Inviting...', originalText);
 
             const updates = {};
-            updates[`groups/${gid}/members/${uid}`] = true;
-            updates[`user_groups/${uid}/${gid}`] = true;
+            updates[`groups/${groupId}/members/${uid}`] = true;
+            updates[`user_groups/${uid}/${groupId}`] = true;
 
             db.ref().update(updates).then(() => {
-                showToast('Member added successfully!', 'success');
+                showToast("Member added!", "success");
                 document.getElementById('addUserModal').remove();
-            }).catch(e => showToast('Failed to add member: ' + e.message));
+            }).catch(e => {
+                showToast(e.message);
+                setBtnLoading(btn, false, '', originalText);
+            });
         }
 
         // Group Members List Modal
@@ -2153,13 +2189,12 @@
         }
 
         function updateProfile() {
-            const btn = event.target;
-            const originalText = btn.innerHTML;
+            const btn = document.querySelector('button[onclick="updateProfile()"]');
+            const originalText = 'Save Changes';
             const newName = document.getElementById('editAlias').value.trim();
             if (!newName) return showToast("Name cannot be empty.");
 
-            btn.disabled = true;
-            btn.innerHTML = 'Optimizing...';
+            setBtnLoading(btn, true, 'Optimizing Profile...', originalText);
 
             const updates = { name: newName };
             if (tempAvatarData) updates.avatar = tempAvatarData;
@@ -2170,8 +2205,7 @@
                 tempAvatarData = null;
             }).catch(e => {
                 showToast("Update failed: " + e.message);
-                btn.disabled = false;
-                btn.innerHTML = originalText;
+                setBtnLoading(btn, false, '', originalText);
             });
         }
 
@@ -2230,10 +2264,14 @@
             const oldPass = document.getElementById('oldPassword').value;
             const newPass = document.getElementById('newPassword').value;
             const confPass = document.getElementById('confirmPassword').value;
+            const btn = document.querySelector('button[onclick="handlePasswordUpdate()"]');
+            const originalText = 'Update';
 
             if (!oldPass) return showToast("Enter your current password.");
             if (newPass.length < 6) return showToast("New password should be at least 6 characters.");
             if (newPass !== confPass) return showToast("New passwords do not match.");
+
+            setBtnLoading(btn, true, 'Verifying Credentials...', originalText);
 
             const cred = firebase.auth.EmailAuthProvider.credential(currentUser.email, oldPass);
             
@@ -2243,8 +2281,12 @@
                     showToast("Password updated successfully!", "success");
                     document.getElementById('passwordModal').remove();
                     document.getElementById('profileModal').remove();
-                }).catch(e => showToast("Update failed: " + e.message));
+                }).catch(e => {
+                    showToast("Update failed: " + e.message);
+                    setBtnLoading(btn, false, '', originalText);
+                });
             }).catch(e => {
+                setBtnLoading(btn, false, '', originalText);
                 if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials' || (e.message && e.message.includes('invalid-login-credentials'))) {
                     showToast("Incorrect current password. Please try again.");
                 } else {

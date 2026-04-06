@@ -2319,7 +2319,7 @@
 
             // Map IDs to available user data + myself
             const members = memberIds.map(uid => {
-                if (uid === currentUser.uid) return { name: 'You', email: currentUser.email, online: true };
+                if (uid === currentUser.uid) return { name: 'You', email: currentUser.email, avatar: myData ? myData.avatar : null, online: true };
                 const u = usersData.find(ud => ud.uid === uid);
                 if (u) {
                     const isOnline = u.lastSeen && (now - u.lastSeen < 60000);
@@ -2427,19 +2427,48 @@
             const file = input.files[0];
             if (!file) return;
 
-            // Immediate compression for performance
+            // Enforce 2MB size limit
+            if (file.size > 2 * 1024 * 1024) {
+                showToast("Max uploading size is 2mb.", "error");
+                input.value = ""; // Clear input for safety
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = function (e) {
                 const img = new Image();
                 img.onload = function () {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    canvas.width = 100;
-                    canvas.height = 100;
-                    ctx.drawImage(img, 0, 0, 100, 100);
-                    tempAvatarData = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    // High resolution for best quality
+                    // We'll cap the dimensions at 800px whilst maintaining aspect ratio
+                    let width = img.width;
+                    let height = img.height;
+                    const maxSize = 800;
+
+                    if (width > height) {
+                        if (width > maxSize) {
+                            height *= maxSize / width;
+                            width = maxSize;
+                        }
+                    } else {
+                        if (height > maxSize) {
+                            width *= maxSize / height;
+                            height = maxSize;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Output at 0.9 quality for best clarity/size trade-off
+                    tempAvatarData = canvas.toDataURL('image/jpeg', 0.9);
                     document.getElementById('profilePreview').innerHTML = `<img src="${tempAvatarData}" class="w-full h-full object-cover">`;
-                    showToast("Profile identity optimized!", "success");
+                    showToast("Profile image updated with high quality!", "success");
                 };
                 img.src = e.target.result;
             };

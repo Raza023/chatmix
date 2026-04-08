@@ -443,56 +443,54 @@
         }
 
         function sendCode() {
-            tempEmail = document.getElementById('email').value;
+            const email = document.getElementById('email').value;
             const name = document.getElementById('name').value;
             const btn = event.target;
             const originalText = 'Get Started';
 
-            if (!tempEmail || !name) return showToast('Please fill all fields to continue.');
+            if (!email || !name) return showToast('Please fill all fields to continue.');
 
-            setBtnLoading(btn, true, 'Sending OTP...', originalText);
+            setBtnLoading(btn, true, 'Sending Secret Link...', originalText);
 
-            verificationCode = Math.floor(1000 + Math.random() * 9000);
-            const templateParams = { to_email: tempEmail, name: name, otp_code: verificationCode };
+            const actionCodeSettings = {
+                // URL you want to redirect back to. The domain (e.g. localhost) must be whitelisted in the Firebase Console.
+                url: window.location.href.split('?')[0],
+                handleCodeInApp: true
+            };
 
-            emailjs.send("service_ijfry7u", "template_igxg83j", templateParams)
-                .then(function () {
-                    showToast('Verification code sent to email!', 'success');
-                    db.ref('pendingUsers/' + tempEmail.replace('.', '_')).set({ name, code: verificationCode });
+            auth.sendSignInLinkToEmail(email, actionCodeSettings)
+                .then(() => {
+                    // Save email and name locally to complete registration when the user clicks the link
+                    window.localStorage.setItem('emailForSignIn', email);
+                    window.localStorage.setItem('nameForSignIn', name);
+
+                    showToast('Secure sign-in link sent to your email!', 'success');
                     renderVerify();
-                }, function (error) {
-                    showToast('Failed to send email. Check your connection.');
+                })
+                .catch((error) => {
+                    showToast('Error: ' + error.message);
                     setBtnLoading(btn, false, '', originalText);
                 });
         }
 
         function renderVerify() {
             app.innerHTML = `
-            <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in">
-                <h2 class="text-2xl font-bold mb-6 text-center">Verify Identity</h2>
-                <p class="text-gray-400 mb-6 text-center">Enter the 4-digit code sent to your email.</p>
-                <input id="code" maxlength="4" onkeydown="if(event.key === 'Enter') verifyCode()" class="glass-input p-4 w-full rounded-xl text-center text-2xl tracking-widest mb-4" placeholder="0000">
-                <button onclick="verifyCode()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">Verify & Continue</button>
+            <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in text-center">
+                <div class="w-20 h-20 bg-secondary/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg class="w-10 h-10 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                </div>
+                <h2 class="text-2xl font-bold mb-4">Check Your Inbox</h2>
+                <p class="text-gray-400 mb-8 px-4 text-sm">We've sent a <strong>secure link</strong> to your email. Click the link to complete your identity verification and join ChatMix.</p>
+                <div class="flex flex-col space-y-3">
+                    <button onclick="window.open('https://mail.google.com')" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">Open Email</button>
+                    <button onclick="renderSignup()" class="text-gray-500 hover:text-white transition-colors text-xs font-semibold uppercase tracking-widest mt-4">Change Email</button>
+                </div>
             </div>`;
         }
 
+        // Link validation logic is now handled automatically in the App Init section
         function verifyCode() {
-            const entered = document.getElementById('code').value;
-            const btn = event.target;
-            const originalText = 'Verify & Continue';
-
-            setBtnLoading(btn, true, 'Verifying...', originalText);
-
-            db.ref('pendingUsers/' + tempEmail.replace('.', '_')).once('value', snap => {
-                const data = snap.val();
-                if (data && entered == data.code) {
-                    renderCreatePassword();
-                } else {
-                    showToast('Incorrect verification code.');
-                    setBtnLoading(btn, false, '', originalText);
-                    renderSignup();
-                }
-            });
+            // This function is deprecated in the Secure Link flow
         }
 
         function renderCreatePassword() {
@@ -2440,7 +2438,7 @@
                 img.onload = function () {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    
+
                     // High resolution for best quality
                     // We'll cap the dimensions at 800px whilst maintaining aspect ratio
                     let width = img.width;
@@ -2458,7 +2456,7 @@
                             height = maxSize;
                         }
                     }
-                    
+
                     canvas.width = width;
                     canvas.height = height;
                     ctx.imageSmoothingEnabled = true;
@@ -2582,8 +2580,48 @@
             });
         }
 
-        // Init App with Session Check
+        // Init App with Session Check and Link Handler
         auth.onAuthStateChanged(user => {
+            // Priority 1: Check if this is an email sign-in link
+            if (auth.isSignInWithEmailLink(window.location.href)) {
+                let email = window.localStorage.getItem('emailForSignIn');
+                const name = window.localStorage.getItem('nameForSignIn');
+
+                if (!email) {
+                    // Fail-safe: if the user opens the link on a different device
+                    email = window.prompt('Please provide your email for confirmation');
+                }
+
+                if (email) {
+                    showToast('Completing verification...', 'success');
+                    auth.signInWithEmailLink(email, window.location.href)
+                        .then((result) => {
+                            window.localStorage.removeItem('emailForSignIn');
+                            const user = result.user;
+
+                            // Check if this is a new user setup
+                            db.ref('users/' + user.uid).once('value', snap => {
+                                if (!snap.exists()) {
+                                    db.ref('users/' + user.uid).set({
+                                        email: email,
+                                        name: name || email.split('@')[0],
+                                        avatar: null,
+                                        createdAt: Date.now()
+                                    });
+                                }
+                                setCookie('chatmix_logged_in', user.uid, 20);
+                                currentUser = user;
+                                renderChat();
+                            });
+                        })
+                        .catch((error) => {
+                            showToast('Link verification failed: ' + error.message);
+                            renderLogin();
+                        });
+                    return;
+                }
+            }
+
             const sessionActive = getCookie('chatmix_logged_in');
             if (user && sessionActive) {
                 currentUser = user;

@@ -432,9 +432,15 @@
                     <p class="text-gray-400 mt-2">Create your account to start mixing.</p>
                 </div>
                 <div class="space-y-4">
-                    <input id="email" maxlength="100" class="glass-input p-4 w-full rounded-xl" placeholder="Email">
-                    <input id="name" maxlength="50" onkeydown="if(event.key === 'Enter') sendCode()" class="glass-input p-4 w-full rounded-xl" placeholder="Alias (Display Name)">
-                    <button onclick="sendCode()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg mt-4">Send Verification Code</button>
+                    <input id="regName" maxlength="50" class="glass-input p-4 w-full rounded-xl" placeholder="Full Name">
+                    <input id="regEmail" maxlength="100" class="glass-input p-4 w-full rounded-xl" placeholder="Email Address">
+                    <div class="relative">
+                        <input id="regPassword" maxlength="50" type="password" class="glass-input p-4 pr-12 w-full rounded-xl" placeholder="Choose Password">
+                        <button onclick="togglePassword('regPassword', this)" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                        </button>
+                    </div>
+                    <button onclick="handleSignup()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg mt-4">Create Account & Verify</button>
                     <p class="text-center mt-4 text-sm text-gray-400">
                         Already have an account? <span onclick="renderLogin()" class="text-purple-400 cursor-pointer hover:underline">Login</span>
                     </p>
@@ -442,48 +448,54 @@
             </div>`;
         }
 
-        function sendCode() {
-            const email = document.getElementById('email').value;
-            const name = document.getElementById('name').value;
+        function handleSignup() {
+            const email = document.getElementById('regEmail').value.trim();
+            const name = document.getElementById('regName').value.trim();
+            const password = document.getElementById('regPassword').value;
             const btn = event.target;
-            const originalText = 'Get Started';
+            const originalText = 'Create Account & Verify';
 
-            if (!email || !name) return showToast('Please fill all fields to continue.');
+            if (!email || !name || !password) return showToast('Please fill all fields.');
+            if (password.length < 6) return showToast('Password must be at least 6 characters.');
 
-            setBtnLoading(btn, true, 'Sending Secret Link...', originalText);
+            setBtnLoading(btn, true, 'Creating Account...', originalText);
 
-            const actionCodeSettings = {
-                // URL you want to redirect back to. The domain (e.g. localhost) must be whitelisted in the Firebase Console.
-                url: window.location.href.split('?')[0],
-                handleCodeInApp: true
-            };
+            auth.createUserWithEmailAndPassword(email, password)
+                .then((userCred) => {
+                    const user = userCred.user;
+                    
+                    // 1. Set the display name / profile in DB
+                    db.ref('users/' + user.uid).set({
+                        email: email,
+                        name: name,
+                        createdAt: Date.now()
+                    });
 
-            auth.sendSignInLinkToEmail(email, actionCodeSettings)
-                .then(() => {
-                    // Save email and name locally to complete registration when the user clicks the link
-                    window.localStorage.setItem('emailForSignIn', email);
-                    window.localStorage.setItem('nameForSignIn', name);
-
-                    showToast('Secure sign-in link sent to your email!', 'success');
-                    renderVerify();
+                    // 2. Send the secure verification email (no payload OTP)
+                    user.sendEmailVerification().then(() => {
+                        showToast('Verification email sent!', 'success');
+                        renderVerify();
+                    });
                 })
                 .catch((error) => {
-                    showToast('Error: ' + error.message);
+                    showToast(error.message);
                     setBtnLoading(btn, false, '', originalText);
                 });
         }
 
         function renderVerify() {
+            const user = auth.currentUser;
             app.innerHTML = `
             <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in text-center">
                 <div class="w-20 h-20 bg-secondary/20 rounded-full flex items-center justify-center mx-auto mb-6">
                     <svg class="w-10 h-10 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                 </div>
-                <h2 class="text-2xl font-bold mb-4">Check Your Inbox</h2>
-                <p class="text-gray-400 mb-8 px-4 text-sm">We've sent a <strong>secure link</strong> to your email. Click the link to complete your identity verification and join ChatMix.</p>
+                <h2 class="text-2xl font-bold mb-4">Verify Your Email</h2>
+                <p class="text-gray-400 mb-8 px-4 text-sm">We've sent a verification link to <strong>${user ? user.email : 'your email'}</strong>. Please click the link to activate your account.</p>
                 <div class="flex flex-col space-y-3">
-                    <button onclick="window.open('https://mail.google.com')" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">Open Email</button>
-                    <button onclick="renderSignup()" class="text-gray-500 hover:text-white transition-colors text-xs font-semibold uppercase tracking-widest mt-4">Change Email</button>
+                    <button onclick="window.location.reload()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">I've Verified My Email</button>
+                    <button onclick="auth.currentUser.sendEmailVerification().then(() => showToast('Resent!', 'success'))" class="text-secondary hover:underline text-xs font-bold">Resend Link</button>
+                    <button onclick="auth.signOut().then(() => renderLogin())" class="text-gray-500 hover:text-white transition-colors text-xs font-semibold uppercase tracking-widest mt-4">Back to Login</button>
                 </div>
             </div>`;
         }
@@ -1044,7 +1056,7 @@
                     document.getElementById('deleteChatBtn').classList.remove('hidden');
                     document.getElementById('leaveGroupBtn').classList.add('hidden');
                 } else {
-                    document.getElementById('deleteChatBtn').classList.add('hidden');
+                    document.getElementById('deleteChatBtn').classList.remove('hidden');
                     document.getElementById('leaveGroupBtn').classList.remove('hidden');
                 }
                 document.getElementById('addUserToGroupBtn').classList.remove('hidden');
@@ -2580,53 +2592,20 @@
             });
         }
 
-        // Init App with Session Check and Link Handler
+        // Init App with Session Check and Verification Gate
         auth.onAuthStateChanged(user => {
-            // Priority 1: Check if this is an email sign-in link
-            if (auth.isSignInWithEmailLink(window.location.href)) {
-                let email = window.localStorage.getItem('emailForSignIn');
-                const name = window.localStorage.getItem('nameForSignIn');
-
-                if (!email) {
-                    // Fail-safe: if the user opens the link on a different device
-                    email = window.prompt('Please provide your email for confirmation');
+            if (user) {
+                // Check if user has verified their email
+                if (user.emailVerified) {
+                    currentUser = user;
+                    setCookie('chatmix_logged_in', user.uid, 20);
+                    renderChat();
+                } else {
+                    // Not verified yet, show them the verify screen
+                    renderVerify();
                 }
-
-                if (email) {
-                    showToast('Completing verification...', 'success');
-                    auth.signInWithEmailLink(email, window.location.href)
-                        .then((result) => {
-                            window.localStorage.removeItem('emailForSignIn');
-                            const user = result.user;
-
-                            // Check if this is a new user setup
-                            db.ref('users/' + user.uid).once('value', snap => {
-                                if (!snap.exists()) {
-                                    db.ref('users/' + user.uid).set({
-                                        email: email,
-                                        name: name || email.split('@')[0],
-                                        avatar: null,
-                                        createdAt: Date.now()
-                                    });
-                                }
-                                setCookie('chatmix_logged_in', user.uid, 20);
-                                currentUser = user;
-                                renderChat();
-                            });
-                        })
-                        .catch((error) => {
-                            showToast('Link verification failed: ' + error.message);
-                            renderLogin();
-                        });
-                    return;
-                }
-            }
-
-            const sessionActive = getCookie('chatmix_logged_in');
-            if (user && sessionActive) {
-                currentUser = user;
-                renderChat();
             } else {
+                eraseCookie('chatmix_logged_in');
                 renderLogin();
             }
         });

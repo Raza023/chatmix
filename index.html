@@ -265,6 +265,11 @@
             window.console.warn = noop;
             window.console.error = noop;
             window.console.info = noop;
+
+            // Request Notification Permission on Load
+            if ("Notification" in window && Notification.permission === "default") {
+                Notification.requestPermission();
+            }
         })();
 
         // Global Helpers
@@ -895,9 +900,10 @@
                 }
 
                 if (initialLoad) return;
-                if (msg.sender !== currentUser.uid && gid !== selectedUser) {
+                if (msg.sender !== currentUser.uid && (gid !== selectedUser || document.hidden)) {
                     unreadCounts[gid] = (unreadCounts[gid] || 0) + 1;
                     showToast(`New message in ${name}`, 'success');
+                    notifyBrowser(`Group ${name}`, msg.text || 'Sent a message.');
                     renderUserList();
                 }
             });
@@ -923,10 +929,10 @@
 
                 if (initialLoad) return;
 
-                if (msg.sender !== currentUser.uid && uid !== selectedUser) {
+                if (msg.sender !== currentUser.uid && (uid !== selectedUser || document.hidden)) {
                     unreadCounts[uid] = (unreadCounts[uid] || 0) + 1;
                     showToast(`New message from ${name}`, 'success');
-                    notifyBrowser(`New Message: ${name}`, msg.text || 'Sent you a message.');
+                    notifyBrowser(`${name}`, msg.text || 'Sent you a message.');
                     renderUserList();
                 }
             });

@@ -396,7 +396,7 @@
         const db = firebase.database();
 
         let currentUser = null;
-        let verificationCode = null;
+        let isProcessingLink = false;
         let tempEmail = null;
 
         function renderLogin() {
@@ -458,24 +458,23 @@
             if (!email || !name || !password) return showToast('Please fill all fields.');
             if (password.length < 6) return showToast('Password must be at least 6 characters.');
 
-            setBtnLoading(btn, true, 'Creating Account...', originalText);
+            setBtnLoading(btn, true, 'Sending Verification Link...', originalText);
 
-            auth.createUserWithEmailAndPassword(email, password)
-                .then((userCred) => {
-                    const user = userCred.user;
-                    
-                    // 1. Set the display name / profile in DB
-                    db.ref('users/' + user.uid).set({
-                        email: email,
-                        name: name,
-                        createdAt: Date.now()
-                    });
+            const actionCodeSettings = {
+                url: window.location.href.split('?')[0],
+                handleCodeInApp: true
+            };
 
-                    // 2. Send the secure verification email (no payload OTP)
-                    user.sendEmailVerification().then(() => {
-                        showToast('Verification email sent!', 'success');
-                        renderVerify();
-                    });
+            auth.sendSignInLinkToEmail(email, actionCodeSettings)
+                .then(() => {
+                    // SECURE DELAYED SETUP: Store data locally so we can create the actual account 
+                    // only after the user proves email ownership via the link.
+                    window.localStorage.setItem('emailForSignIn', email);
+                    window.localStorage.setItem('nameForSignIn', name);
+                    window.localStorage.setItem('passForSignIn', password);
+
+                    showToast('Secure sign-in link sent to your email!', 'success');
+                    renderVerify();
                 })
                 .catch((error) => {
                     showToast(error.message);
@@ -484,18 +483,17 @@
         }
 
         function renderVerify() {
-            const user = auth.currentUser;
+            const savedEmail = window.localStorage.getItem('emailForSignIn');
             app.innerHTML = `
             <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in text-center">
                 <div class="w-20 h-20 bg-secondary/20 rounded-full flex items-center justify-center mx-auto mb-6">
                     <svg class="w-10 h-10 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
                 </div>
-                <h2 class="text-2xl font-bold mb-4">Verify Your Email</h2>
-                <p class="text-gray-400 mb-8 px-4 text-sm">We've sent a verification link to <strong>${user ? user.email : 'your email'}</strong>. Please click the link to activate your account.</p>
+                <h2 class="text-2xl font-bold mb-4">Activation Link Sent</h2>
+                <p class="text-gray-400 mb-8 px-4 text-sm">We've sent a secure activation link to <strong>${savedEmail || 'your email'}</strong>. Your account will be created once you click that link.</p>
                 <div class="flex flex-col space-y-3">
-                    <button onclick="window.location.reload()" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">I've Verified My Email</button>
-                    <button onclick="auth.currentUser.sendEmailVerification().then(() => showToast('Resent!', 'success'))" class="text-secondary hover:underline text-xs font-bold">Resend Link</button>
-                    <button onclick="auth.signOut().then(() => renderLogin())" class="text-gray-500 hover:text-white transition-colors text-xs font-semibold uppercase tracking-widest mt-4">Back to Login</button>
+                    <button onclick="window.open('https://mail.google.com')" class="gradient-btn text-white p-4 w-full rounded-xl shadow-lg">Open Email</button>
+                    <button onclick="renderSignup()" class="text-gray-500 hover:text-white transition-colors text-xs font-semibold uppercase tracking-widest mt-4">Start Over</button>
                 </div>
             </div>`;
         }
@@ -2593,18 +2591,73 @@
             });
         }
 
-        // Init App with Session Check and Verification Gate
+        // Init App with Session Check, Verification Gate and Delayed Creation Handler
         auth.onAuthStateChanged(user => {
-            if (user) {
-                // Check if user has verified their email
-                if (user.emailVerified) {
-                    currentUser = user;
-                    setCookie('chatmix_logged_in', user.uid, 20);
-                    renderChat();
+            if (isProcessingLink) return;
+
+            // Priority 1: Check if this is an incoming registration link
+            if (auth.isSignInWithEmailLink(window.location.href)) {
+                isProcessingLink = true;
+                let email = window.localStorage.getItem('emailForSignIn');
+                const name = window.localStorage.getItem('nameForSignIn');
+                const password = window.localStorage.getItem('passForSignIn');
+
+                if (!email) email = window.prompt('Please confirm your email to complete registration:');
+
+                if (email) {
+                    showToast('Activating account...', 'success');
+                    auth.signInWithEmailLink(email, window.location.href)
+                        .then((result) => {
+                            // CLEANUP: Immediately remove the code from URL so the listener doesn't trigger again
+                            window.history.replaceState({}, document.title, window.location.pathname);
+
+                            const user = result.user;
+
+                            // DELAYED CREATION: Now that the user is verified, finalize their profile
+                            const setupPromise = db.ref('users/' + user.uid).once('value').then(snap => {
+                                if (!snap.exists()) {
+                                    return db.ref('users/' + user.uid).set({
+                                        email: email,
+                                        name: name || email.split('@')[0],
+                                        createdAt: Date.now()
+                                    });
+                                }
+                            });
+
+                            // Apply password if it was a new registration
+                            const passwordPromise = (password && user) ? user.updatePassword(password) : Promise.resolve();
+
+                            Promise.all([setupPromise, passwordPromise]).then(() => {
+                                window.localStorage.removeItem('emailForSignIn');
+                                window.localStorage.removeItem('nameForSignIn');
+                                window.localStorage.removeItem('passForSignIn');
+                                setCookie('chatmix_logged_in', user.uid, 20);
+                                currentUser = user;
+                                isProcessingLink = false; // Reset after all async work
+                                renderChat();
+                            }).catch(() => {
+                                isProcessingLink = false;
+                                renderChat(); // Enter anyway if profile load fails but login worked
+                            });
+                        })
+                        .catch((error) => {
+                            isProcessingLink = false;
+                            // Silently ignore if it's a re-trigger error
+                            if (error.code !== 'auth/invalid-action-code') {
+                                showToast('Activation failed: ' + error.message);
+                            }
+                            renderLogin();
+                        });
+                    return;
                 } else {
-                    // Not verified yet, show them the verify screen
-                    renderVerify();
+                    isProcessingLink = false;
                 }
+            }
+
+            if (user) {
+                currentUser = user;
+                setCookie('chatmix_logged_in', user.uid, 20);
+                renderChat();
             } else {
                 eraseCookie('chatmix_logged_in');
                 renderLogin();

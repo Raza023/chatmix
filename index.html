@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ChatMix | Connect Seamlessly</title>
-    <link rel="icon" type="image/png" href="./favicon.png">
+    <link rel="icon" type="image/png" href="./src/favicon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -24,7 +24,7 @@
 
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            background: url('./bg.png') no-repeat center center fixed;
+            background: url('./src/bg.png') no-repeat center center fixed;
             background-size: cover;
             min-height: 100vh;
             color: #fff;
@@ -375,7 +375,7 @@
             if ("Notification" in window && Notification.permission === "granted") {
                 new Notification(title, {
                     body: body,
-                    icon: './logo.png'
+                    icon: './src/logo.png'
                 });
             }
         }
@@ -403,7 +403,7 @@
             app.innerHTML = `
             <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in">
                 <div class="text-center mb-8">
-                    <img src="./logo.png" alt="ChatMix Logo" class="w-20 h-20 mx-auto mb-4 rounded-2xl shadow-xl">
+                    <img src="./src/logo.png" alt="ChatMix Logo" class="w-20 h-20 mx-auto mb-4 rounded-2xl shadow-xl">
                     <h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">ChatMix</h1>
                     <p class="text-gray-400 mt-2">Welcome back! Please login.</p>
                 </div>
@@ -427,7 +427,7 @@
             app.innerHTML = `
             <div class="max-w-md w-full glass-panel p-8 rounded-3xl animate-fade-in">
                 <div class="text-center mb-8">
-                    <img src="./logo.png" alt="ChatMix Logo" class="w-16 h-16 mx-auto mb-4 rounded-xl shadow-lg">
+                    <img src="./src/logo.png" alt="ChatMix Logo" class="w-16 h-16 mx-auto mb-4 rounded-xl shadow-lg">
                     <h2 class="text-3xl font-bold text-white">Join ChatMix</h2>
                     <p class="text-gray-400 mt-2">Create your account to start mixing.</p>
                 </div>
@@ -593,7 +593,7 @@
                     <div class="p-6 border-b border-white/10">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center space-x-3">
-                                <img src="./logo.png" class="w-10 h-10 rounded-xl">
+                                <img src="./src/logo.png" class="w-10 h-10 rounded-xl">
                                 <span class="font-bold text-xl tracking-tight">ChatMix</span>
                             </div>
                             <div class="flex items-center space-x-2">
@@ -663,7 +663,7 @@
                     
                     <div id="chatBox" onscroll="handleChatScroll(this)" class="flex-1 p-6 overflow-y-auto space-y-4 relative">
                         <div id="welcomePlaceholder" class="flex items-center justify-center h-full text-gray-500 opacity-50 flex-col space-y-4">
-                            <img src="./logo.png" class="w-24 h-24 grayscale opacity-20">
+                            <img src="./src/logo.png" class="w-24 h-24 grayscale opacity-20">
                             <p>Welcome to ChatMix. Your messages are end-to-end encrypted.</p>
                         </div>
                     </div>
@@ -1426,7 +1426,7 @@
                                     ${m.type === 'image' ?
                                 `<img src="${m.text}" class="w-full max-w-[300px] rounded-xl border border-white/10 shadow-2xl transition-transform hover:scale-[1.02] cursor-pointer" onclick="openLightbox(this.src)">` :
                                 (m.text === ':tom_meme:' ?
-                                    `<img src="./tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg house-meme" onclick="openLightbox(this.src)">` :
+                                    `<img src="./src/tom.gif" class="w-full max-w-[240px] rounded-lg border border-white/10 shadow-lg house-meme" onclick="openLightbox(this.src)">` :
                                     `<p class="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">${escapeHTML(m.text)}</p>`
                                 )
                             }
@@ -1672,7 +1672,7 @@
             db.ref(`calls/${callId}`).update({ status: 'ringing' });
 
             // Ringtone
-            ringtoneAudio = new Audio('./ringtone.mp3');
+            ringtoneAudio = new Audio('./src/ringtone.mp3');
             ringtoneAudio.loop = true;
             ringtoneAudio.play().catch(e => console.warn("Audio play blocked by browser. User interaction needed."));
 

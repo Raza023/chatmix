@@ -970,20 +970,25 @@
             if (!usersDiv) return;
             usersDiv.innerHTML = '';
 
+            const filteredGroups = myGroups.filter(g => {
+                const matchesSearch = g.name.toLowerCase().includes(searchQuery);
+                return searchQuery ? matchesSearch : true;
+            });
+
             const filteredUsers = usersData.filter(u => {
                 const matchesSearch = u.email.toLowerCase().includes(searchQuery) || u.name.toLowerCase().includes(searchQuery);
                 if (searchQuery) return matchesSearch;
                 return activeChatUids.has(u.uid);
             });
 
-            if (filteredUsers.length === 0) {
+            const allConversations = [...filteredGroups, ...filteredUsers];
+
+            if (allConversations.length === 0) {
                 usersDiv.innerHTML = `<div class="p-8 text-center text-gray-500 text-sm">
-                    ${searchQuery ? 'No users found matching your search.' : 'No active chats. Use search to find friends!'}
+                    ${searchQuery ? 'No conversations found matching your search.' : 'No active chats. Use search to find friends!'}
                 </div>`;
                 return;
             }
-
-            const allConversations = [...myGroups, ...filteredUsers];
 
             allConversations.forEach(u => {
                 const isOnline = u.isGroup || (u.lastSeen && (now - u.lastSeen < 60000));

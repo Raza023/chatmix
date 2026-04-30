@@ -693,6 +693,16 @@
                         </button>
                     </div>
 
+                    <div id="editPreview" class="hidden mx-6 mb-2 glass-panel p-3 rounded-xl border-l-4 border-yellow-500 flex items-center justify-between animate-fade-in">
+                        <div class="flex-1 min-w-0 pr-4">
+                            <p class="text-xs font-bold text-yellow-500 mb-0.5">Editing Message</p>
+                            <p id="editText" class="text-xs text-white/50 truncate"></p>
+                        </div>
+                        <button onclick="cancelEdit()" class="p-1 hover:bg-white/10 rounded-full text-white/40 hover:text-white">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                        </button>
+                    </div>
+
                     <div class="relative px-6 mb-2">
                         <div id="emojiSuggestions" class="hidden absolute bottom-full left-6 right-6 p-2 mb-2 glass-panel rounded-xl border border-white/10 z-50 flex flex-col space-y-1"></div>
                     </div>
@@ -777,6 +787,7 @@
         let typingUsers = {}; // uid -> boolean
         let typingTimer;
         let replyingTo = null; // { id, text, sender }
+        let editingMsgId = null;
 
         // WebRTC Variables
         let pc = null;
@@ -1204,6 +1215,11 @@
             let msg = document.getElementById('msg').value;
             if (!msg || !selectedUser) return;
 
+            if (editingMsgId) {
+                updateMsg(editingMsgId, msg);
+                return;
+            }
+
             if (msg.length > 1500) {
                 return showToast('Message is too long. Limit is 1500 characters.');
             }
@@ -1415,11 +1431,17 @@
                     } else {
                         innerContent = `
                             <div class="max-w-[85%] md:max-w-md group relative">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1 px-1 ${isMine ? 'text-right' : 'text-left'}">${escapeHTML(actualSenderName)}</p>
+                                 <p class="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1 px-1 ${isMine ? 'text-right' : 'text-left'}">${escapeHTML(actualSenderName)}</p>
                                 ${isMine ? `
-                                <button onclick="deleteMsg('${key}')" class="absolute -bottom-2 -left-2 p-1.5 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg cursor-pointer transform hover:scale-110 active:scale-90 z-20">
-                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
-                                </button>` : ''}
+                                <div class="absolute -bottom-2 ${isMine ? '-left-2' : '-right-2'} flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                    ${m.type !== 'image' && m.text !== ':tom_meme:' ? `
+                                    <button onclick="editMsg('${key}', '${escapeHTML(m.text).replace(/'/g, "\\'").replace(/\n/g, ' ')}')" class="p-1.5 bg-yellow-500 rounded-full shadow-lg cursor-pointer transform hover:scale-110 active:scale-90">
+                                        <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                                    </button>` : ''}
+                                    <button onclick="deleteMsg('${key}')" class="p-1.5 bg-red-500 rounded-full shadow-lg cursor-pointer transform hover:scale-110 active:scale-90">
+                                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                                    </button>
+                                </div>` : ''}
                                 
                                 <div class="absolute -top-8 ${isMine ? 'right-0' : 'left-0'} flex space-x-1 p-1.5 rounded-2xl reaction-picker opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 z-30 pointer-events-none group-hover:pointer-events-auto shadow-xl ring-1 ring-white/10">
                                     <button onclick="setReply('${key}', '${m.type === 'image' ? 'Image' : escapeHTML(m.text).replace(/'/g, "\\'").replace(/\n/g, ' ')}', '${escapeHTML(actualSenderName).replace(/'/g, "\\'")}')" class="p-1 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors">
@@ -1443,6 +1465,7 @@
                                     ${reactionsHtml}
                                     <div class="flex items-center justify-end space-x-1 mt-1 opacity-60">
                                         <p class="text-[10px]">${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
+                                        ${m.edited ? `<span class="text-[9px] italic opacity-50 ml-1">edited</span>` : ''}
                                         ${ticks}
                                     </div>
                                 </div>
@@ -1490,6 +1513,7 @@
         }
 
         function setReply(id, text, sender) {
+            cancelEdit();
             replyingTo = { id, text, sender };
             document.getElementById('replyUser').innerText = sender;
             document.getElementById('replyText').innerText = text;
@@ -1500,6 +1524,37 @@
         function cancelReply() {
             replyingTo = null;
             document.getElementById('replyPreview').classList.add('hidden');
+        }
+
+        function editMsg(id, text) {
+            cancelReply();
+            editingMsgId = id;
+            document.getElementById('editText').innerText = text;
+            document.getElementById('editPreview').classList.remove('hidden');
+            const input = document.getElementById('msg');
+            input.value = text;
+            input.focus();
+            autoResize(input);
+        }
+
+        function cancelEdit() {
+            editingMsgId = null;
+            document.getElementById('editPreview').classList.add('hidden');
+            const input = document.getElementById('msg');
+            input.value = '';
+            autoResize(input);
+        }
+
+        function updateMsg(id, newText) {
+            if (!currentChatPath) return;
+            db.ref(currentChatPath + '/' + id).update({
+                text: newText,
+                edited: true,
+                editTime: Date.now()
+            }).then(() => {
+                showToast('Message updated.', 'success');
+                cancelEdit();
+            }).catch(e => showToast('Failed to update: ' + e.message));
         }
 
         function scrollToMessage(id) {

@@ -228,6 +228,12 @@
             animation-delay: 0.4s;
         }
 
+        #emojiSuggestions {
+            max-height: 250px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
         @keyframes typing {
             0% {
                 opacity: 0.2;
@@ -2130,6 +2136,7 @@
 
         let emojiIdx = 0;
         let activeMatches = [];
+        let lastEmojiQuery = '';
 
         function handleEmojiInput() {
             const input = document.getElementById('msg');
@@ -2139,6 +2146,11 @@
             const lastWord = words[words.length - 1];
 
             if (lastWord.startsWith(':') && lastWord.length >= 1) {
+                if (lastWord !== lastEmojiQuery) {
+                    emojiIdx = 0;
+                    lastEmojiQuery = lastWord;
+                    div.scrollTop = 0;
+                }
                 activeMatches = Object.entries(EMOJI_MAP).filter(([k]) => k.includes(lastWord));
                 if (activeMatches.length > 0) {
                     if (emojiIdx >= activeMatches.length) emojiIdx = 0;
@@ -2149,6 +2161,7 @@
                 }
             } else {
                 div.classList.add('hidden');
+                lastEmojiQuery = '';
             }
         }
 
@@ -2186,11 +2199,16 @@
         function renderEmojiSuggestions() {
             const div = document.getElementById('emojiSuggestions');
             div.innerHTML = activeMatches.map(([k, v], i) => `
-                <div onclick="applyEmoji('${k}')" class="p-2 ${i === emojiIdx ? 'bg-white/20' : 'hover:bg-white/10'} rounded-lg cursor-pointer flex justify-between items-center text-sm transition-colors">
+                <div id="emoji-item-${i}" onclick="applyEmoji('${k}')" class="p-2 ${i === emojiIdx ? 'bg-white/20' : 'hover:bg-white/10'} rounded-lg cursor-pointer flex justify-between items-center text-sm transition-colors">
                     <span class="${i === emojiIdx ? 'text-white' : 'text-white/60'}">${escapeHTML(k)}</span>
                     <span>${v === ':tom_meme:' ? '🐱' : v}</span>
                 </div>
             `).join('');
+
+            const activeItem = document.getElementById(`emoji-item-${emojiIdx}`);
+            if (activeItem) {
+                activeItem.scrollIntoView({ block: 'nearest' });
+            }
         }
 
         function handleMsgKeydown(e) {

@@ -1,6 +1,12 @@
-# <img src="./src/logo.png" width="48" height="48" align="center" style="border-radius: 12px; margin-right: 10px;"> ChatMix
+# <img src="./src/favicon.png" width="48" height="48" align="center" style="border-radius: 12px; margin-right: 10px;"> ChatMix
 
 **ChatMix** is a premium, real-time messaging application designed with a sleek glassmorphism aesthetic. It offers a seamless communication experience with private messaging, group chats, and high-quality audio calling, all powered by Firebase and WebRTC.
+
+<p align="center">
+  <a href="https://raza023.github.io/chatmix/">
+    <img src="https://img.shields.io/badge/Open-ChatMix-blue?style=for-the-badge">
+  </a>
+</p>
 
 ---
 

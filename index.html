@@ -1208,7 +1208,7 @@
             db.ref('user_chats/' + currentUser.uid + '/' + selectedUser).set(true);
             db.ref('user_chats/' + selectedUser + '/' + currentUser.uid).set(true);
 
-            db.ref('users/' + currentUser.uid).update({ lastSeen: Date.now() });
+            db.ref('users/' + currentUser.uid).update({ lastSeen: firebase.database.ServerValue.TIMESTAMP });
         }
 
         function sendMsg() {
@@ -1234,7 +1234,7 @@
             const payload = {
                 sender: currentUser.uid,
                 text: msg,
-                time: Date.now(),
+                time: firebase.database.ServerValue.TIMESTAMP,
                 status: 1 // Sent
             };
 
@@ -1251,7 +1251,7 @@
             db.ref('user_chats/' + selectedUser + '/' + currentUser.uid).set(true);
 
             // Update status on message send
-            db.ref('users/' + currentUser.uid).update({ lastSeen: Date.now() });
+            db.ref('users/' + currentUser.uid).update({ lastSeen: firebase.database.ServerValue.TIMESTAMP });
 
             const msgEl = document.getElementById('msg');
             msgEl.value = '';
@@ -1324,44 +1324,40 @@
                 snap.forEach(child => {
                     allMessages.push({ key: child.key, val: child.val() });
                 });
-                // Sort by timestamp ascending to guarantee correct date-divider order
-                allMessages.sort((a, b) => (a.val.time || 0) - (b.val.time || 0));
+                // Sort by timestamp ascending, then by key to guarantee strict order
+                allMessages.sort((a, b) => (a.val.time - b.val.time) || a.key.localeCompare(b.key));
 
-                // Remove ALL existing date dividers so they are re-inserted in correct order
-                Array.from(chatBox.children).forEach(child => {
-                    if (child.id && child.id.startsWith('date-')) child.remove();
+                // Identify valid keys for cleanup
+                allMessages.forEach(({ key, val: m }) => {
+                    currentKeys.add(key);
+                    currentKeys.add(`date-${formatDividerDate(m.time).replace(/\s/g, '-')}`);
                 });
 
                 let lastDateLabel = "";
+                let prevEl = null;
                 allMessages.forEach(({ key, val: m }) => {
-                    currentKeys.add(key);
+                    const dateLabel = formatDividerDate(m.time);
+                    const dateId = `date-${dateLabel.replace(/\s/g, '-')}`;
 
-                    // Check if message is only emoji
                     const emojiOnlyRegex = /^(\s*[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{1F191}-\u{1F251}\u{1F004}\u{1F0CF}\u{1F170}-\u{1F171}\u{1F17E}-\u{1F17F}\u{1F18E}\u{3030}\u{2B50}\u{2B55}\u{2934}-\u{2935}\u{2B05}-\u{2B07}\u{2B1B}-\u{2B1C}\u{3297}\u{3299}\u{1F3FB}-\u{1F3FF}\u{200D}\u{FE0F}]+\s*)+$/u;
                     const isOnlyEmoji = m.type !== 'image' && m.text !== ':tom_meme:' && emojiOnlyRegex.test(m.text);
 
-                    // Date Divider Logic — insert divider before the first message of each new date
-                    const dateLabel = formatDividerDate(m.time);
-                    const dateId = `date-${dateLabel.replace(/\s/g, '-')}`;
-                    currentKeys.add(dateId);
-
                     if (dateLabel !== lastDateLabel) {
-                        // Always create a fresh divider and insert it before the message
-                        const dateDiv = document.createElement('div');
-                        dateDiv.id = dateId;
-                        dateDiv.className = "flex justify-center my-6 animate-fade-in";
-                        dateDiv.innerHTML = `
-                            <div class="glass-panel px-4 py-1.5 rounded-full border border-white/10 shadow-xl">
-                                <span class="text-[10px] font-bold uppercase tracking-widest text-white/50">${dateLabel}</span>
-                            </div>
-                        `;
-                        // Insert right before existing message el if it exists, else append
-                        const existingMsg = document.getElementById(`msg-${key}`);
-                        if (existingMsg) {
-                            chatBox.insertBefore(dateDiv, existingMsg);
-                        } else {
-                            chatBox.appendChild(dateDiv);
+                        let dateDiv = document.getElementById(dateId);
+                        if (!dateDiv) {
+                            dateDiv = document.createElement('div');
+                            dateDiv.id = dateId;
+                            dateDiv.className = "flex justify-center my-6 animate-fade-in w-full";
+                            dateDiv.innerHTML = `
+                                <div class="glass-panel px-4 py-1.5 rounded-full border border-white/10 shadow-xl">
+                                    <span class="text-[10px] font-bold uppercase tracking-widest text-white/50">${dateLabel}</span>
+                                </div>
+                            `;
                         }
+                        if (prevEl) prevEl.after(dateDiv);
+                        else chatBox.prepend(dateDiv);
+                        
+                        prevEl = dateDiv;
                         lastDateLabel = dateLabel;
                     }
 
@@ -1478,14 +1474,18 @@
                         messageEl = document.createElement('div');
                         messageEl.id = msgId;
                         messageEl.className = messageAlignmentClass;
-                        messageEl.innerHTML = innerContent;
-                        chatBox.appendChild(messageEl);
-                    } else {
-                        // Update existing message only if content changed to avoid blinking
-                        if (messageEl.innerHTML !== innerContent) {
-                            messageEl.innerHTML = innerContent;
-                        }
                     }
+                    
+                    // Update content
+                    if (messageEl.innerHTML !== innerContent) {
+                        messageEl.innerHTML = innerContent;
+                    }
+                    
+                    // Ensure correct position in DOM
+                    if (prevEl) prevEl.after(messageEl);
+                    else chatBox.prepend(messageEl);
+                    
+                    prevEl = messageEl;
                 });
 
                 // Remove deleted messages or unused date dividers

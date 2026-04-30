@@ -1383,8 +1383,12 @@
                                 </div>
                             `;
                         }
-                        if (prevEl) prevEl.after(dateDiv);
-                        else chatBox.prepend(dateDiv);
+                        
+                        if (prevEl) {
+                            if (dateDiv.previousElementSibling !== prevEl) prevEl.after(dateDiv);
+                        } else {
+                            if (chatBox.firstElementChild !== dateDiv) chatBox.prepend(dateDiv);
+                        }
                         
                         prevEl = dateDiv;
                         lastDateLabel = dateLabel;
@@ -1395,7 +1399,6 @@
 
                     if (!isMine) {
                         if (isGroup) {
-                            // Group Receipts: Mark as Read (3)
                             if (!m.receipts || m.receipts[currentUser.uid] < 3) {
                                 db.ref('messages/' + id + '/' + key + '/receipts/' + currentUser.uid).set(3);
                             }
@@ -1420,7 +1423,6 @@
                         </div>`;
                     }
 
-                    // Process Quote
                     let quoteHtml = '';
                     if (m.replyTo && msgMap[m.replyTo]) {
                         const parent = msgMap[m.replyTo];
@@ -1433,8 +1435,6 @@
                     }
 
                     const senderName = isMine ? 'You' : (document.getElementById('selectedUserName').innerText);
-
-                    // For groups, we need to find the specific sender's alias correctly
                     let actualSenderName = senderName;
                     if (isGroup && !isMine) {
                         const senderObj = usersData.find(u => u.uid === m.sender);
@@ -1442,10 +1442,10 @@
                     }
 
                     let innerContent = '';
-                    let messageAlignmentClass = `flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in mb-4`;
+                    let messageAlignmentClass = `flex ${isMine ? 'justify-end' : 'justify-start'} mb-4`;
 
                     if (m.type === 'system') {
-                        messageAlignmentClass = "flex justify-center animate-fade-in my-2 w-full";
+                        messageAlignmentClass = "flex justify-center my-2 w-full";
                         innerContent = `
                             <div class="glass-panel px-4 py-1.5 rounded-full border border-secondary/30 shadow-md flex items-center space-x-2 bg-black/20">
                                 <svg class="w-3.5 h-3.5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
@@ -1512,17 +1512,20 @@
                     if (!messageEl) {
                         messageEl = document.createElement('div');
                         messageEl.id = msgId;
+                        messageEl.className = messageAlignmentClass + " animate-fade-in";
+                    } else {
                         messageEl.className = messageAlignmentClass;
                     }
                     
-                    // Update content
                     if (messageEl.innerHTML !== innerContent) {
                         messageEl.innerHTML = innerContent;
                     }
                     
-                    // Ensure correct position in DOM
-                    if (prevEl) prevEl.after(messageEl);
-                    else chatBox.prepend(messageEl);
+                    if (prevEl) {
+                        if (messageEl.previousElementSibling !== prevEl) prevEl.after(messageEl);
+                    } else {
+                        if (chatBox.firstElementChild !== messageEl) chatBox.prepend(messageEl);
+                    }
                     
                     prevEl = messageEl;
                 });

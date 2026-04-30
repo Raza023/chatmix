@@ -680,38 +680,40 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 13l-7 7-7-7m14-8l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path></svg>
                     </button>
 
-                    <div id="typingIndicator" class="px-6 py-1 h-6 text-xs text-secondary font-medium animate-pulse hidden">
-                        <span id="typingText"></span>
-                    </div>
-
-                    <div id="replyPreview" class="hidden mx-6 mb-2 glass-panel p-3 rounded-xl border-l-4 border-secondary flex items-center justify-between animate-fade-in">
-                        <div class="flex-1 min-w-0 pr-4">
-                            <p id="replyUser" class="text-xs font-bold text-secondary mb-0.5"></p>
-                            <p id="replyText" class="text-xs text-white/50 truncate"></p>
+                    <div id="chatInputSection" class="hidden">
+                        <div id="typingIndicator" class="px-6 py-1 h-6 text-xs text-secondary font-medium animate-pulse hidden">
+                            <span id="typingText"></span>
                         </div>
-                        <button onclick="cancelReply()" class="p-1 hover:bg-white/10 rounded-full text-white/40 hover:text-white">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
-                        </button>
-                    </div>
 
-                    <div id="editPreview" class="hidden mx-6 mb-2 glass-panel p-3 rounded-xl border-l-4 border-yellow-500 flex items-center justify-between animate-fade-in">
-                        <div class="flex-1 min-w-0 pr-4">
-                            <p class="text-xs font-bold text-yellow-500 mb-0.5">Editing Message</p>
-                            <p id="editText" class="text-xs text-white/50 truncate"></p>
+                        <div id="replyPreview" class="hidden mx-6 mb-2 glass-panel p-3 rounded-xl border-l-4 border-secondary flex items-center justify-between animate-fade-in">
+                            <div class="flex-1 min-w-0 pr-4">
+                                <p id="replyUser" class="text-xs font-bold text-secondary mb-0.5"></p>
+                                <p id="replyText" class="text-xs text-white/50 truncate"></p>
+                            </div>
+                            <button onclick="cancelReply()" class="p-1 hover:bg-white/10 rounded-full text-white/40 hover:text-white">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                            </button>
                         </div>
-                        <button onclick="cancelEdit()" class="p-1 hover:bg-white/10 rounded-full text-white/40 hover:text-white">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
-                        </button>
-                    </div>
 
-                    <div class="relative px-6 mb-2">
-                        <div id="emojiSuggestions" class="hidden absolute bottom-full left-6 right-6 p-2 mb-2 glass-panel rounded-xl border border-white/10 z-50 flex flex-col space-y-1"></div>
-                    </div>
-                    <div class="p-2 glass-panel mx-6 mb-6 rounded-2xl border border-white/10 flex items-center space-x-2 focus-within:ring-2 focus-within:ring-secondary transition-all">
-                        <textarea id="msg" rows="1" maxlength="1500" onpaste="handlePaste(event)" oninput="handleEmojiInput(); handleTypingStatus(); autoResize(this)" onkeydown="handleMsgKeydown(event)" class="bg-black/40 border-none focus:ring-0 flex-1 p-3 text-white placeholder-white/30 font-medium rounded-xl resize-none max-h-40 overflow-y-auto" placeholder="Write something dope..."></textarea>
-                        <button onclick="sendMsg()" class="gradient-btn p-3 rounded-xl shadow-lg text-white group flex-shrink-0">
-                            <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
-                        </button>
+                        <div id="editPreview" class="hidden mx-6 mb-2 glass-panel p-3 rounded-xl border-l-4 border-yellow-500 flex items-center justify-between animate-fade-in">
+                            <div class="flex-1 min-w-0 pr-4">
+                                <p class="text-xs font-bold text-yellow-500 mb-0.5">Editing Message</p>
+                                <p id="editText" class="text-xs text-white/50 truncate"></p>
+                            </div>
+                            <button onclick="cancelEdit()" class="p-1 hover:bg-white/10 rounded-full text-white/40 hover:text-white">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                            </button>
+                        </div>
+
+                        <div class="relative px-6 mb-2">
+                            <div id="emojiSuggestions" class="hidden absolute bottom-full left-6 right-6 p-2 mb-2 glass-panel rounded-xl border border-white/10 z-50 flex flex-col space-y-1"></div>
+                        </div>
+                        <div class="p-2 glass-panel mx-6 mb-6 rounded-2xl border border-white/10 flex items-center space-x-2 focus-within:ring-2 focus-within:ring-secondary transition-all">
+                            <textarea id="msg" rows="1" maxlength="1500" onpaste="handlePaste(event)" oninput="handleEmojiInput(); handleTypingStatus(); autoResize(this)" onkeydown="handleMsgKeydown(event)" class="bg-black/40 border-none focus:ring-0 flex-1 p-3 text-white placeholder-white/30 font-medium rounded-xl resize-none max-h-40 overflow-y-auto" placeholder="Write something dope..."></textarea>
+                            <button onclick="sendMsg()" class="gradient-btn p-3 rounded-xl shadow-lg text-white group flex-shrink-0">
+                                <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>`;
@@ -1085,6 +1087,7 @@
 
             const actions = document.getElementById('chatActions');
             actions.classList.remove('hidden');
+            document.getElementById('chatInputSection').classList.remove('hidden');
 
             // Always show Audio Call button for both Individual and Group
             actions.querySelector('button[title="Audio Call"]').classList.remove('hidden');
